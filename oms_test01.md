@@ -53,12 +53,11 @@ git push origin mater
 
 ### 添加配置文件
 
-项目中的配置文件一般包含跟数据库相关的很多敏感信息，因此最好不要把配置信息同步更新到远程仓库，可以在与项目同一个文件夹下新建一个文件夹，专门存放项目的配置文件信息
+项目中的配置文件一般包含跟数据库相关的很多敏感信息，因此最好不要把配置信息同步更新到远程仓库
+在项目根目录下新建一个文件夹 oms_conf，专门存放项目的配置文件信息
 
 ```bash
 # 打开 Pycharm 终端
-# 切换到项目所在的目录
-cd ..
 # 新建配置文件夹
 mkdir oms_conf
 # 切换到该文件夹下，新建数据库配置文件 oms_db.py
@@ -120,26 +119,15 @@ create database oms_test default charset=utf8;
 show databases;
 ```
 
-#### 4. 导入项目外的配置文件内容
+#### 4. 导入配置文件内容
 
 ```python
 # oms_test/oms_test/settings.py
 ......
-# 导入 os 包
-import os
 from pathlib import Path
 ......
 BASE_DIR = Path(__file__).resolve().parent.parent
-# 导入刚才创建的项目配置文件夹
-OMS_CONF_PATH = '..'
-# 将该路径添加到项目的系统路径下
-os.sys.path.append(OMS_CONF_PATH)
-# ... 表示切换到项目所在路径
-# . 表示切换到与本配置文件同一个目录下, 即 oms_test/oms_test
-# .. 表示切换到本配置文件的上一个目录下, 即项目根目录 oms_test/
-# ... 表示切换到配置文件的上一个目录的上一个目录下, 即项目所在目录
-# Pycharm 中按住 Ctrl 键，然后左键点击 oms_db, 就会跳转到该文件下, 说明导入路径没问题; 否则会飘红
-from ...oms_conf import oms_db
+from oms_conf import oms_db
 ```
 
 #### 5. 注释掉配置文件中数据库的配置代码
@@ -186,8 +174,10 @@ pymysql.install_as_MySQLdb()
 git status
 # 将想要上传的文件添加
 git add oms_test/__init__.py oms_test/settings.py
-
-
+# 放进缓存区并添加注释
+git commit -m '数据库的配置'
+# 更新到远程仓库
+git push origin master
 ```
 
 
