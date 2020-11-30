@@ -10,15 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.1/ref/settings/
 """
 
-import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-# 导入刚才创建的项目配置文件夹
-OMS_CONF_PATH = '..'
-os.sys.path.append(OMS_CONF_PATH)
-from ...oms_conf import oms_db
+from oms_conf import oms_db
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
