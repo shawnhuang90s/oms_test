@@ -1,5 +1,4 @@
 .idea/
-.vscode
 *.pyc
 __pycache__/
 oms_conf/

@@ -180,6 +180,28 @@ git commit -m '数据库的配置'
 git push origin master
 ```
 
+### 添加忽略文件 .gitignore
+
+项目中有些文件是不需要上传到远程仓库的，因此要配置一下. 项目根目录下新建 .gitignore 文件
+
+```bash
+# oms_test/.gitignore
+.idea/
+*.pyc
+__pycache__/
+oms_conf/
+```
+
+由于 git 已经有本地缓存，因此必须删除缓存，再把代码重新上传到远程仓库，否则忽略文件不生效
+
+```bash
+# 打开 Pycharm 终端
+git rm -r -f --cached .
+git add .
+git commit -m '添加忽略文件并重新上传代码到远程仓库'
+git push origin master
+```
+
 
 
 
