@@ -202,6 +202,22 @@ git commit -m '添加忽略文件并重新上传代码到远程仓库'
 git push origin master
 ```
 
+### 第一次运行项目
+
+```bash
+打开 manage.py 文件 -> 右键点击 Run 'manage'
+# 如果报错提示如下，表示 MySQL 版本冲突
+File "/home/yanfa/.virtualenvs/oms_test/lib/python3.7/site-packages/django/db/backends/mysql/base.py", line 36, in <module>
+    raise ImproperlyConfigured('mysqlclient 1.4.0 or newer is required; you have %s.' % Database.__version__)
+django.core.exceptions.ImproperlyConfigured: mysqlclient 1.4.0 or newer is required; you have 0.10.1.
+# 解决办法：点击 raise 上面提示的文件路径, 把跳转到的文件的下面内容注释掉
+# if version < (1, 4, 0):
+#     raise ImproperlyConfigured('mysqlclient 1.4.0 or newer is required; you have %s.' % Database.__version__)
+
+# 再次运行 manage.py 文件, 如果没有报错
+点击左上角 manage.py 框里的三角形 -> 点击 Edit Configurations -> 找到 Parameters，对应框里输入：runserver 127.0.0.1:8080 -> Apply -> OK -> 点击刚才 manage.py 框右边的绿色三角形直接运行项目 -> 此时 Pycharm 下面的 Run 窗口会自动弹开 -> 点击网址：http://127.0.0.1:8080/ -> 自动在浏览器弹出一个网址, 即 Django 运行页面
+```
+
 
 
 
