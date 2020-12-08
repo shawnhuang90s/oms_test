@@ -2,10 +2,156 @@
 
 ## 订单管理系统
 
-### 新建虚拟环境
+### 准备工作
+
+#### 1. 登录云服务器
 
 ```bash
-# -p python3 表示指定使用 Python3 版本(本项目使用的是 Python3.7 版本)
+# 假设有个自己的云服务器
+ssh -l root 182.254.177.42
+```
+
+#### 2. 假设系统中的 Python3 版本比较低，想卸载后下载更高版本
+
+```bash
+# 卸载 Python3
+rpm -qa|grep python3|xargs rpm -ev --allmatches --nodeps
+# 删除所有残余文件
+whereis python3 |xargs rm -frv
+# 查看系统中的 Python 版本
+whereis python
+```
+
+#### 3. CentOS7 安装 Python3 版本
+
+```bash
+# 更新系统软件包
+yum update -y
+
+# 安装软件管理包和可能使用的依赖
+yum -y groupinstall "Development tools"
+yum install openssl-devel bzip2-devel expat-devel gdbm-devel readline-devel sqlite-devel
+
+# 下载 Pyhton3
+wget https://www.python.org/ftp/python/3.8.1/Python-3.8.1.tgz
+
+# 解压
+tar -zxvf Python-3.8.1.tgz
+
+# 编译安装到指定路径
+cd Python-3.8.1
+./configure --prefix=/usr/local/python3
+make && make install
+
+# 建立软链接，添加变量，方便在终端中直接使用 Python3
+ln -s /usr/local/python3/bin/python3.8 /usr/bin/python3
+
+# Python3 安装完成之后 pip3 也一块安装完成，不需要再单独安装，一样建立软链接
+# 如果提示已存在 /usr/bin/pip3，就先删除它
+rm -rf /usr/bin/pip3
+ln -s /usr/local/python3/bin/pip3.8 /usr/bin/pip3
+
+# 更新 pip3
+pip3 install --upgrade pip
+
+# 查看是否已经有 Python3 和 pip3
+python3
+pip3 -V
+
+# 设置 Python 默认版本，当前默认是 Python2
+python
+Python 2.7.5 (default, Aug  7 2019, 00:51:29) 
+[GCC 4.8.5 20150623 (Red Hat 4.8.5-39)] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+>>> exit()
+
+# 备份原来的软连接
+mv /usr/bin/python /usr/bin/python.bak
+# 创建新的软连接
+ln -s /usr/local/python3/bin/python3 /usr/bin/python
+# 查看 Python 默认版本
+python
+Python 3.8.1 (default, Dec  7 2020, 11:56:21) 
+[GCC 4.8.5 20150623 (Red Hat 4.8.5-44)] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> exit()
+
+# 再返回2.7版本
+whereis python
+rm -f /usr/bin/python
+ln -s /usr/bin/python2
+ln -s /usr/bin/python2.7 /usr/bin/python
+python
+```
+
+### 虚拟环境
+
+#### 1. 下载 virtualenv 和 virtualenvwrapper
+
+```bash
+pip3 install virtualenv
+pip3 install virtualenvwrapper
+# 如果报错：
+ModuleNotFoundError: No module named '_ctypes'
+    ----------------------------------------
+ERROR: Command errored out with exit status 1: python setup.py egg_info Check the logs for full command output.
+# 版本问题导致，解决：
+vim /usr/bin/yum # 将首行的 Python 改为 Python2.7
+vim /usr/libexec/urlgrabber-ext-down # 与上面同理
+# 安装外部函数库
+yum install libffi-devel -y
+
+# 重新安装 Python3
+cd Python-3.8.1
+./configure --prefix=/usr/local/python3
+make && make install
+pip3 install virtualenvwrapper
+
+# 配置文件添加虚拟环境路径
+find / -type f -name 'virtualenvwrapper.sh' 
+# 复制上面的结果，把下面内容添加到 .bashrc 文件末尾
+vim ~/.bashrc
+
+# 指定virtualenvwrapper执行的python版本
+VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3
+# 指定虚拟环境存放目录，.virtualenvs目录名可自拟
+export WORKON_HOME=$HOME/.virtualenvs
+# virtualenvwrapper.sh所在目录
+source /usr/local/python3/bin/virtualenvwrapper.sh   
+
+# 保存退出，重新激活该文件
+source ~/.bashrc
+```
+
+#### 2. 新建虚拟环境
+
+```bash
+wrokon
+mkvirtualenv oms_test -p python3
+# 如果没报错，说明没问题；反之，如果新建时报错：
+which: no virtualenv in (/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin)
+ERROR: virtualenvwrapper could not find virtualenv in your path
+# 解决办法：
+find / -type f -name 'virtualenv*'
+# 把这个复制
+/usr/local/python3/bin/virtualenv
+
+vim ~/.bashrc
+# 指定virtualenvwrapper执行的python版本
+VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3
+# 指定虚拟环境存放目录，.virtualenvs目录名可自拟
+export WORKON_HOME=$HOME/.virtualenvs
+# 添加 virtualenv 的路径
+export VIRTUALENVWRAPPER_VIRTUALENV=/usr/local/python3/bin/virtualenv
+# virtualenvwrapper.sh所在目录
+source /usr/local/python3/bin/virtualenvwrapper.sh   
+
+# 保存退出，重新激活
+source ~/.bashrc
+
+wrokon
+# -p python3 表示指定使用 Python3 版本(本项目使用的是 Python3.8 版本)
+# 云服务器和本地都新建好虚拟环境
 mkvirtualenv oms_test -p python3
 ```
 
@@ -218,9 +364,136 @@ django.core.exceptions.ImproperlyConfigured: mysqlclient 1.4.0 or newer is requi
 点击左上角 manage.py 框里的三角形 -> 点击 Edit Configurations -> 找到 Parameters，对应框里输入：runserver 127.0.0.1:8080 -> Apply -> OK -> 点击刚才 manage.py 框右边的绿色三角形直接运行项目 -> 此时 Pycharm 下面的 Run 窗口会自动弹开 -> 点击网址：http://127.0.0.1:8080/ -> 自动在浏览器弹出一个网址, 即 Django 运行页面
 ```
 
+### 添加钉钉报警机器人功能
+
+#### 1. 钉钉群添加群机器人
+
+```bash
+新建或选择一个钉钉群 -> 点击群机器人 -> 点击自定义 -> 添加 -> 填写机器人名字 -> 点击说明文档可以查看开发者文档 -> 安全设置至少选择一个添加内容 -> 注意：如果选择关键词设置，则消息中至少包含其中一个关键词才可以发送成功 -> 完成 -> 复制 Webhook ->
+```
+
+#### 2. 项目中添加钉钉报警 API 示例
+
+```python
+import json
+import requests
+from enum import Enum
 
 
+class DingDingAPI(object):
+    """
+    发送钉钉消息
+    1.在群里添加自定义机器人
+    2.获取到机器人名字 和 url
+    """
 
+    class MsgType(Enum):
+        text = 'text'
+        link = 'link'
+        markdown = 'markdown'
 
+    HOOK_MAP = {
+        'oms_test': {
+            'title': '报警测试',
+            # 这里的 url 即对应某个钉钉的某个机器人 url
+            'url': 'https://oapi.dingtalk.com/robot/send?access_token=3963e26b849294299817694debeaa76457004d8f98acebc30b54a2579c000685'
+        },
+    }
 
+    def __init__(self, name):
+        _hook = self.HOOK_MAP.get(name)
+        self.title, self.url = _hook.get('title'), _hook.get('url')
+
+    @property
+    def msg_type(self):
+        return self._msg_type
+
+    @msg_type.setter
+    def msg_type(self, value):
+        if not isinstance(value, self.MsgType):
+            raise Exception('{} 必须是 WebHook.MsgType 类型'.format(value))
+        self._msg_type = value
+
+    def _send_text(self, msg, at=None, at_all=True, *args, **kwargs):
+        """
+        发送文本类型消息
+        :param msg: 消息内容
+        :param at:被@人的手机号(在content里添加@人的手机号) 列表　["156xxxx8827", "189xxxx8325"]
+        :param at_all:@所有人时：true，否则为：false
+        :return:
+        """
+        self._data = {
+            "msgtype": self.MsgType.text.value,
+            "text": {
+                "content": '{}警报: {}'.format(self.title, msg)
+            },
+            "at": {
+                "atMobiles": at,
+                "isAtAll": at_all
+            }
+        }
+
+    def _send_link(self, msg, title, message_url, pic_url='', *args, **kwargs):
+        """
+        发送链接类型消息
+        :param msg:消息内容。如果太长只会部分展示
+        :param title:消息标题
+        :param message_url:点击消息跳转的URL
+        :param pic_url:图片URL
+        :return:
+        """
+        self._data = {
+            "msgtype": self.MsgType.link.value,
+            "link": {
+                "text": msg,
+                "title": '{}警报: {}'.format(self.title, title),
+                "picUrl": pic_url,
+                "messageUrl": message_url
+            }
+        }
+
+    def _send_markdown(self, msg, title=None, at=None, at_all=True, *args, **kwargs):
+        """
+        发送　markdown格式的消息
+        :param msg: markdown格式的消息
+        :param title: 首屏会话透出的展示内容
+        :param at: 被@人的手机号(在text内容里要有@手机号) 列表　["156xxxx8827", "189xxxx8325"]
+        :param at_all: @所有人时：true，否则为：false
+        :return:
+        """
+        self._data = {
+            "msgtype": self.MsgType.markdown.value,
+            "markdown": {
+                "title": '{}警报: {}'.format(self.title, title),
+                "text": msg
+            },
+            "at": {
+                "atMobiles": at,
+                "isAtAll": at_all
+            }
+        }
+
+    def send(self, *args, **kwargs):
+        send_method = {
+            self.MsgType.text: self._send_text,
+            self.MsgType.link: self._send_link,
+            self.MsgType.markdown: self._send_markdown
+        }
+        if not self._msg_type:
+            raise Exception('请先设置消息类型')
+        _send_params = send_method[self._msg_type]
+        _send_params(*args, **kwargs)
+        res = requests.post(self.url, data=json.dumps(self._data), headers={'Content-Type': 'application/json'}, timeout=10)
+
+        return res.content
+
+if __name__ == '__main__':
+    hook = DingDingAPI('oms_test')
+    hook.msg_type = hook.MsgType.markdown
+    # 这里调用 send() 方法时, 参数里必须包含 "注意" 二字
+    # 因为在添加机器人时设置的关键词目前就只有这个
+    # r = hook.send('注意：这是一次测试...', at=["15018267752"], atall=False)
+    r = hook.send('注意：这是一次测试...', atall=False)
+    print(r)
+```
 
