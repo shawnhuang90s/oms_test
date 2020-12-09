@@ -694,14 +694,14 @@ cluster_stats_messages_received:22663
 redis-cli --cluster add-node 127.0.0.1:7106 127.0.0.1:7107
 ```
 
-#### 2. 项目中安装 Redis 和 RedisCluster
+#### 7. 项目中安装 Redis 和 RedisCluster
 
 ```bash
 pip install redis
 pip install redis-py-cluster
 ```
 
-#### 3. 配置文件夹 oms_conf 中新增 oms_redis.py 文件
+#### 8. 配置文件夹 oms_conf 中新增 oms_redis.py 文件
 
 ```python
 from rediscluster import RedisCluster
@@ -726,7 +726,7 @@ class RedisConf:
 REDIS_CONF = RedisConf()
 ```
 
-#### 4. 项目中新建一个专门存放对外 API 接口的子应用
+#### 9. 项目中新建一个专门存放对外 API 接口的子应用
 
 ```bash
 # Pycharm 终端项目根目录下新建子应用
@@ -742,17 +742,19 @@ INSTALLED_APPS = [
 ]
 ```
 
-#### 5. 安装 rest_framework
+#### 10. 安装 rest_framework
 
 ```bash
 pip install django-rest-framework
 ```
 
-#### 6. Redis 查询接口
+#### 11. Redis 查询接口
 
 ```python
 # oms_test/oms_test/settings.py
 from oms_conf import oms_db, oms_redis
 REDIS_CONF = oms_redis.REDIS_CONF
+
+# oms_test/intercept_api/views.py
 ```
 
