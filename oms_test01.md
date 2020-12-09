@@ -197,7 +197,7 @@ git remote add origin https://github.com/shawnhuang90s/oms.git
 git push origin mater
 ```
 
-### 添加配置文件
+### 添加配置文件夹
 
 项目中的配置文件一般包含跟数据库相关的很多敏感信息，因此最好不要把配置信息同步更新到远程仓库
 在项目根目录下新建一个文件夹 oms_conf，专门存放项目的配置文件信息
@@ -282,7 +282,8 @@ from oms_conf import oms_db
 # oms_test/oms_test/settings.py
 ......
 # 找到 DATABASES 变量对应的字典内容，将其注释掉, 并导入对应的配置信息
-DATABASES = oms_db.DATABASE
+from oms_conf import oms_db
+DATABASES = oms_db.DATABASES
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.sqlite3',
@@ -495,5 +496,263 @@ if __name__ == '__main__':
     # r = hook.send('注意：这是一次测试...', at=["15018267752"], atall=False)
     r = hook.send('注意：这是一次测试...', atall=False)
     print(r)
+```
+
+### 新增店铺信息
+
+#### 1. 新建 store 子应用
+
+```bash
+python manage.py startapp store
+
+# oms_test/oms_test/settings.py
+
+```
+
+
+
+
+
+### Redis 集群
+
+#### 1. CentOS7 下载/安装/启动 Redis 
+
+```bash
+# 下载 Redis 包
+wget https://download.redis.io/releases/redis-6.0.9.tar.gz
+```
+
+#### 2. 安装 Redis
+
+> 参考资料：https://www.cnblogs.com/zuidongfeng/p/8032505.html
+
+```bash
+# 安装依赖包
+yum install gcc
+# 解压
+tar -zxvf redis-6.0.9.tar.gz
+# 切换到解压后的 Redis 目录
+cd redis-6.0.9
+# 编译安装
+make MALLOC=libc
+# 如果报错如下，很有可能是 redis6.0.9 需要的是 gcc5 及以上的版本，但是 CentOS7 系统自带的 gcc 版本是 4.8，所以就要升级一下 gcc 版本
+make[1]: *** [server.o] Error 1
+make[1]: Leaving directory `/root/redis-6.0.9/src'
+make: *** [all] Error 2
+# 升级 gcc 版本
+sudo yum install centos-release-scl
+sudo yum install devtoolset-8-gcc*
+scl enable devtoolset-8 bash
+gcc -v
+# 把 redis-6.0.9 文件夹删除
+# 因为刚才编译的时候可能有残余文件，可能导致后面的编译失败
+cd ..
+rm -rf redis-6.0.9/
+tar -zxvf redis-6.0.9.tar.gz
+cd redis-6.0.9/
+make MALLOC=libc
+# 编译后会提示你使用 make test ;)
+make test
+# 将 src/ 文件夹复制到 /usr/local/bin/ 目录下
+cp -r src/ /usr/local/bin/
+# 切换到 src 编译安装
+cd src/
+make install
+```
+
+#### 3. 启动 Redis
+
+```bash
+# 启动 Redis，这种方式要一直占着窗口，显然不太好
+./redis-server
+# 按 ctrl+c 关闭，接下来，以后台进程方式启动 Redis
+cd ..
+ls
+vim redis.conf
+# 将 daemonize no 改为 daemonize yes，保存退出
+# 查看当前绝对路径并复制
+pwd
+cd src
+# 指定 redis.conf 文件启动 
+./redis-server /root/redis-6.0.9/redis.conf
+# 查看 redis 进程
+ps -ef | grep redis
+# 发现 Redis 在后台已经启动
+```
+
+#### 4. 设置 Redis 开机自动启动
+
+```bash
+# 在 /etc 目录下新建 redis 目录
+cd /etc
+mkdir redis
+# 将上面解压后的 Redis 文件夹下的 redis.conf 文件（注意每个人的安装路径可能不一样）复制一份到 /etc/redis 目录下，并命名为6379.conf
+cp /root/redis-6.0.9/redis.conf /etc/redis/6379.conf
+# 检查是否复制并重命名成功
+cd redis/
+ls
+# 将 Redis 的启动脚本复制一份放到 /etc/init.d 目录下
+cp /root/redis-6.0.9/utils/redis_init_script /etc/init.d/redis
+# 切换到 init.d 目录下执行自启命令
+cd /etc/init.d/
+chkconfig redis on
+# 如果报错：service redisd does not support chkconfig
+# 编辑 /etc/init.d/redis 文件，第一行加入两行注释, 报错并退出
+# 注释的意思是：Redis服务必须在运行级 2，3，4，5 下被启动或关闭，启动的优先级是 90，关闭的优先级是 10
+# chkconfig:   2345 90 10
+# description:  Redis is a persistent key-value database
+```
+
+#### 5. 尝试以服务形式启动和关闭 Redis
+
+```bash
+# 开启
+service redis start
+# 关闭
+service redis stop
+```
+
+#### 6. 搭建 Redis 集群
+
+> 参考资料：https://www.cnblogs.com/yushangzuiyue/p/9305586.html
+
+```bash
+# 我这里将 Redis 解压在家目录下，因此先切换到家目录
+# 为方便测试，我把 Redis 集群相关文件也放在家目录下
+cd ~
+mkdir redis-cluster
+cd redis-cluster/
+mkdir 7101 7102 7103 7104 7105 7106
+# 将上面解压后的 Redis 目录下 src 里的 redis-server 文件复制到这三个目录下
+cp /root/redis-6.0.9/src/redis-server 7101/
+cp /root/redis-6.0.9/src/redis-server 7102/
+cp /root/redis-6.0.9/src/redis-server 7103/
+cp /root/redis-6.0.9/src/redis-server 7104/
+cp /root/redis-6.0.9/src/redis-server 7105/
+cp /root/redis-6.0.9/src/redis-server 7106/
+# 在每个新建的目录下新增 redis.conf 文件
+vim 7101/redis.conf
+# 添加如下内容，7102/7103 的方法一样，对应修改端口就行
+port 7101
+daemonize yes
+# bind 192.168.253.135  # 绑定对外连接提供的 IP
+# pidfile 7000.pid  # 进程文件名
+cluster-enabled yes
+cluster-config-file nodes-7101.conf
+cluster-node-timeout 5000
+appendonly yes
+# 分别启动这三个目录下的 Redis 服务
+cd 7101/
+./redis-server ./redis.conf
+cd ..
+cd 7102/
+./redis-server ./redis.conf
+cd ..
+cd 7103/
+./redis-server ./redis.conf
+# 查看 Redis 服务进程
+ps -ef | grep redis-server
+root      4821     1  0 15:11 ?        00:00:02 /usr/local/bin/redis-server 127.0.0.1:6379
+root     15765     1  0 16:08 ?        00:00:00 ./redis-server *:7101 [cluster]
+root     16070     1  0 16:10 ?        00:00:00 ./redis-server *:7102 [cluster]
+root     16113     1  0 16:10 ?        00:00:00 ./redis-server *:7103 [cluster]
+root     18513     1  0 16:22 ?        00:00:00 ./redis-server *:7104 [cluster]
+root     18548     1  0 16:22 ?        00:00:00 ./redis-server *:7105 [cluster]
+root     18583     1  0 16:22 ?        00:00:00 ./redis-server *:7106 [cluster]
+root     16239 15208  0 16:10 pts/0    00:00:00 grep --color=auto redis-server
+# 安装 Ruby
+yum install ruby
+# 创建 Redis 集群（Ubuntu 貌似不用这一步？）
+cd ~
+# --cluster-replicas 1 表示从机数量
+redis-cli --cluster create 127.0.0.1:7101 127.0.0.1:7102 127.0.0.1:7103 127.0.0.1:7104 127.0.0.1:7105 127.0.0.1:7106 --cluster-replicas 1
+# 如果 Redis 版本更低，比如是 4.0 版本的，创建集群命令示例：
+# ./redis-trib.rb create --replicas 1 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 127.0.0.1:7004 127.0.0.1:7005
+# 测试进入某个集群点
+redis-cli -c -p 7101
+# 查看集群信息
+127.0.0.1:7101> cluster info
+cluster_state:ok
+cluster_slots_assigned:16384
+cluster_slots_ok:16384
+cluster_slots_pfail:0
+cluster_slots_fail:0
+cluster_known_nodes:6
+cluster_size:3
+cluster_current_epoch:6
+cluster_my_epoch:1
+cluster_stats_messages_ping_sent:11351
+cluster_stats_messages_pong_sent:11312
+cluster_stats_messages_sent:22663
+cluster_stats_messages_ping_received:11307
+cluster_stats_messages_pong_received:11351
+cluster_stats_messages_meet_received:5
+cluster_stats_messages_received:22663
+# 如果 IP 地址是某个服务器的，这样测试：
+# redis-cli -c -h 192.168.199.135 -p 7101
+# 如果要增加节点，可以这样：
+redis-cli --cluster add-node 127.0.0.1:7106 127.0.0.1:7107
+```
+
+#### 2. 项目中安装 Redis 和 RedisCluster
+
+```bash
+pip install redis
+pip install redis-py-cluster
+```
+
+#### 3. 配置文件夹 oms_conf 中新增 oms_redis.py 文件
+
+```python
+from rediscluster import RedisCluster
+
+
+class RedisConf:
+    """Redis 集群配置"""
+
+    _startup_nodes = [
+        {'host': '127.0.0.1', 'port': '7101'},
+        {'host': '127.0.0.1', 'port': '7102'},
+        {'host': '127.0.0.1', 'port': '7103'},
+        {'host': '127.0.0.1', 'port': '7104'},
+        {'host': '127.0.0.1', 'port': '7105'},
+        {'host': '127.0.0.1', 'port': '7106'},
+    ]
+
+    # 链接 Redis 集群
+    redis_cluster_conn = RedisCluster(startup_nodes=_startup_nodes, decode_responses=True, skip_full_coverage_check=True)
+    
+
+REDIS_CONF = RedisConf()
+```
+
+#### 4. 项目中新建一个专门存放对外 API 接口的子应用
+
+```bash
+# Pycharm 终端项目根目录下新建子应用
+# 因为这里的内容都是接口信息，因此删掉用不上的文件 admin.py/models.py/tests.py
+python manage.py startapp interface_api
+
+# 项目配置文件中添加子应用
+# oms_test/oms_test/settings.py
+INSTALLED_APPS = [
+    ......
+    # 自建应用
+    'interface_api.apps.InterfaceApiConfig',
+]
+```
+
+#### 5. 安装 rest_framework
+
+```bash
+pip install django-rest-framework
+```
+
+#### 6. Redis 查询接口
+
+```python
+# oms_test/oms_test/settings.py
+from oms_conf import oms_db, oms_redis
+REDIS_CONF = oms_redis.REDIS_CONF
 ```
 

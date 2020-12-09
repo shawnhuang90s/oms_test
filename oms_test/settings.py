@@ -1,5 +1,5 @@
 from pathlib import Path
-from oms_conf import oms_db
+from oms_conf import oms_db, oms_redis
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,6 +17,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # 自建应用
+    'interface_api.apps.InterfaceApiConfig',
 ]
 
 MIDDLEWARE = [
@@ -77,3 +80,5 @@ USE_L10N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
+
+REDIS_CONF = oms_redis.REDIS_CONF
