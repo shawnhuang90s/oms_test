@@ -20,6 +20,7 @@ INSTALLED_APPS = [
 
     # 自建应用
     'interface_api.apps.InterfaceApiConfig',
+    'store.apps.StoreConfig',
 ]
 
 MIDDLEWARE = [

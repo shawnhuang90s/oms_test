@@ -506,10 +506,115 @@ if __name__ == '__main__':
 python manage.py startapp store
 
 # oms_test/oms_test/settings.py
-
+INSTALLED_APPS = [
+    ......
+    # 自建应用
+    'interface_api.apps.InterfaceApiConfig',
+    'store.apps.StoreConfig',
+]
 ```
 
+#### 2. 新建 Store 模型类
 
+新建一个抽象基类
+
+```python
+# oms_test/utils/base_model
+from django.db import models
+
+class BaseModel(models.Model):
+    """公共模型类"""
+
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    update_time = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        # 定义为抽象基类, 表示迁移数据库的时候忽略这个公共模型类
+        # 换句话说, 数据库不会创建这个模型类对应的表
+        abstract = True
+```
+
+新建店铺表
+
+```python
+from django.db import models
+from utils.base_model import BaseModel
+
+class Store(BaseModel):
+    """店铺模型类"""
+
+    STATUS_CHOICES = (
+        (0, '关闭弃号'),
+        (1, '正常可售'),
+        (2, '注册中'),
+        (3, '暂时关闭'),
+        (4, '注册失败'),
+        (5, '假期模式'),
+    )
+    # 可选择的店铺状态
+    usable_status = (1, 3, 5)
+
+    id = models.AutoField(primary_key=True, verbose_name='店铺ID')
+    name = models.CharField(max_length=200, blank=True, null=True, verbose_name='店铺名')
+    manager_name = models.CharField(max_length=100, blank=True, null=True, verbose_name='店铺负责人')
+    manager_id = models.IntegerField(blank=True, null=True, verbose_name='店铺负责人ID')
+    center = models.CharField(max_length=100, verbose_name='渠道中心')
+    center_id = models.IntegerField(verbose_name='渠道中心ID')
+    platform = models.CharField(max_length=45, verbose_name='平台')
+    market = models.CharField(max_length=200, null=True, verbose_name='站点')
+    market_id = models.IntegerField(null=True, verbose_name='站点ID')
+    status = models.SmallIntegerField(choices=STATUS_CHOICES, null=True, verbose_name='状态')
+    last_download_time = models.DateTimeField(null=True, blank=True, verbose_name='上次抓单时间')
+
+    class Meta:
+        # 告诉 Django 不要管理这个模型类的创建, 修改和删除
+        # 想要允许 Django 管理这个模型类的生命周期, 直接删掉它(因为 True 是默认值)
+        managed = False
+        # 指明该模型类属于 store 这个子应用
+        app_label = 'store'
+        db_table = 'oms_store'
+        verbose_name = verbose_name_plural = '店铺表'
+```
+
+#### 3. 迁移数据库
+
+```bash
+# 指定只迁移 store 子应用下的模型类
+python manage.py makemigrations store
+python manage.py migrate
+
+# 点击 Pycharm 的 Database，发现 oms_test 数据库里有一些表
+# 但是没有 oms_store 表，因为上面 managed = False 设置限制了
+```
+
+#### 4. MySQL 数据库新建 oms_store 表
+
+编写 SQL 语句
+
+>name varchar(200) unique default null comment '店铺名' 
+>
+>表示店铺名设置唯一约束，即该表中不能有重复的店铺名
+
+```mysql
+create table `oms_store` (
+  `id` int(11) not null auto_increment comment '店铺ID',
+  `name` varchar(200) unique default null comment '店铺名',
+  `manager_name` varchar(100) default null comment '店铺负责人',
+  `manager_id` int(11) default null comment '店铺负责人ID',
+  `center` varchar(100) default null comment '渠道中心',
+  `center_id` int(11) default null comment '渠道中心ID',
+  `platform` varchar(45) default null comment '平台名',
+  `market` varchar(200) default null comment '站点',
+  `market_id` int(11) default null comment '站点ID',
+  `status` tinyint(2) default null comment '店铺状态',
+  `last_download_time` datetime default null comment '上次抓单时间',
+  primary key (`id`)
+) engine=InnoDB default charset=utf8 comment '店铺表';
+```
+
+复制上面的 SQL 语句，点击 Pycharm 中 Database 上面的 QL 小图标，会自动打开一个页面
+
+粘贴，将鼠标光标停留在这个语句里的某个位置，左击，然后再点击左上角的绿色三角形按钮即可执行该条 SQL 语句，下方会弹出一个窗口，显示建表过程
 
 
 
@@ -601,6 +706,10 @@ chkconfig redis on
 # 注释的意思是：Redis服务必须在运行级 2，3，4，5 下被启动或关闭，启动的优先级是 90，关闭的优先级是 10
 # chkconfig:   2345 90 10
 # description:  Redis is a persistent key-value database
+
+# PS：Ubuntu 中安装 chkconfig 方法
+sudo apt install sysv-rc-conf
+sudo cp /usr/sbin/sysv-rc-conf /usr/sbin/chkconfig
 ```
 
 #### 5. 尝试以服务形式启动和关闭 Redis
@@ -673,35 +782,61 @@ redis-cli -c -p 7101
 # 查看集群信息
 127.0.0.1:7101> cluster info
 cluster_state:ok
-cluster_slots_assigned:16384
-cluster_slots_ok:16384
-cluster_slots_pfail:0
-cluster_slots_fail:0
-cluster_known_nodes:6
-cluster_size:3
-cluster_current_epoch:6
-cluster_my_epoch:1
-cluster_stats_messages_ping_sent:11351
-cluster_stats_messages_pong_sent:11312
-cluster_stats_messages_sent:22663
-cluster_stats_messages_ping_received:11307
-cluster_stats_messages_pong_received:11351
-cluster_stats_messages_meet_received:5
-cluster_stats_messages_received:22663
+......
 # 如果 IP 地址是某个服务器的，这样测试：
-# redis-cli -c -h 192.168.199.135 -p 7101
+redis-cli -c -h 192.168.199.135 -p 7101
 # 如果要增加节点，可以这样：
 redis-cli --cluster add-node 127.0.0.1:7106 127.0.0.1:7107
 ```
 
-#### 7. 项目中安装 Redis 和 RedisCluster
+#### 7. 使用脚本启动 Redis 方法
+
+```bash
+# 比如我的 Ubuntu 系统中，Redis 下载安装在家目录下
+# 新建一个 sh 文件
+vim start_redis.sh
+# 添加以下内容，保存退出
+#!/bin/sh
+
+cd /home/yanfa/redis-6.0.9/src
+./redis-server ../redis.conf
+cd /home/yanfa/redis-cluster/7101
+./redis-server ./redis.conf
+cd /home/yanfa/redis-cluster/7102
+./redis-server ./redis.conf
+cd /home/yanfa/redis-cluster/7103
+./redis-server ./redis.conf
+cd /home/yanfa/redis-cluster/7104
+./redis-server ./redis.conf
+cd /home/yanfa/redis-cluster/7105
+./redis-server ./redis.conf
+cd /home/yanfa/redis-cluster/7106
+./redis-server ./redis.conf
+
+ps -ef | grep redis
+
+# 每次开机后直接执行该文件即可
+sh start_redis.sh
+# 执行结果：
+yanfa     6424  3633  0 17:04 ?        00:00:01 ./redis-server 127.0.0.1:6379
+yanfa     6544  3633  0 17:08 ?        00:00:00 ./redis-server *:7101 [cluster]
+yanfa     6617  3633  0 17:14 ?        00:00:00 ./redis-server *:7102 [cluster]
+yanfa     6623  3633  0 17:14 ?        00:00:00 ./redis-server *:7103 [cluster]
+yanfa     6629  3633  0 17:14 ?        00:00:00 ./redis-server *:7104 [cluster]
+yanfa     6635  3633  0 17:14 ?        00:00:00 ./redis-server *:7105 [cluster]
+yanfa     6641  3633  0 17:14 ?        00:00:00 ./redis-server *:7106 [cluster]
+yanfa     6797 31557  0 17:19 pts/22   00:00:00 sh start_redis.sh
+yanfa     6813  6797  0 17:19 pts/22   00:00:00 grep redis
+```
+
+#### 8. 项目中安装 Redis 和 RedisCluster
 
 ```bash
 pip install redis
 pip install redis-py-cluster
 ```
 
-#### 8. 配置文件夹 oms_conf 中新增 oms_redis.py 文件
+#### 9. 配置文件夹 oms_conf 中新增 oms_redis.py 文件
 
 ```python
 from rediscluster import RedisCluster
@@ -726,7 +861,7 @@ class RedisConf:
 REDIS_CONF = RedisConf()
 ```
 
-#### 9. 项目中新建一个专门存放对外 API 接口的子应用
+#### 10. 项目中新建一个专门存放对外 API 接口的子应用
 
 ```bash
 # Pycharm 终端项目根目录下新建子应用
@@ -742,7 +877,7 @@ INSTALLED_APPS = [
 ]
 ```
 
-#### 10. 安装 rest_framework
+#### 11. 安装 rest_framework
 
 ```bash
 pip install django-rest-framework
