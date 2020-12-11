@@ -1,3 +1,7 @@
+import os, django
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
+django.setup()
 from django.db import models
 
 
