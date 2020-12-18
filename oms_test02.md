@@ -836,7 +836,7 @@ def save_store_account():
 
     for i in range(1, 200):
         account_dict = dict()
-        store_id = f'test_store_{i}'
+        store_key = f'test_store_{i}'
         ######## Cdiscount ########
         if i <= 5:
             account_dict = dict(
@@ -1003,7 +1003,7 @@ def save_store_account():
                 name=f'name_{i}',
                 password=f'password_{i}',
             )
-        redis_conn.hset(store_account_key, store_id, json.dumps(account_dict))
+        redis_conn.hset(store_account_key, store_key, json.dumps(account_dict))
 
     return
 
@@ -1013,9 +1013,9 @@ if __name__ == '__main__':
     save_store_account()
     # 查看 Redis 中是否有数据
     for i in range(1, 116):
-        store_id = f'test_store_{i}'
-        store_obj = redis_conn.hget(store_account_key, store_id)
-        print(store_obj)
+        store_key = f'test_store_{i}'
+        account_info = redis_conn.hget(store_account_key, store_key)
+        print(account_info)
     # 清除测试数据
     # redis_conn.flushdb()
 ```
@@ -1027,5 +1027,57 @@ redis-cli -h 127.0.0.1 -p 7101 -c
 127.0.0.1:7101> hget store_account_info test_store_1
 "{\"username\": \"username_1\", \"password\": \"password_1\"}"
 127.0.0.1:7101> 
+```
+
+#### 7. 新增 Redis 查询接口
+
+```python
+# oms_test/oms_test/urls.py
+from django.urls import path, include
+
+
+urlpatterns = [
+    path('store/', include(('store.urls', 'store'), namespace='store')),
+]
+
+# oms_test/store/urls.py
+from django.urls import path
+from store.views.redis_query import StoreAccountView
+
+
+urlpatterns = [
+    path('store_account/',StoreAccountView.as_view()),
+]
+
+# oms_test/store/views/redis_query.py
+import json
+from rest_framework import status
+from rest_framework.views import APIView
+from oms_test.settings import REDIS_CONF
+from rest_framework.response import Response
+
+
+class StoreAccountView(APIView):
+    """查询店铺账户信息"""
+    def get(self, request):
+        try:
+            redis_conn = REDIS_CONF.redis_conn
+            store_account_key = REDIS_CONF.store_account_key
+            key = request.query_params.get("key", "")
+            account_info = redis_conn.hget(store_account_key, f'test_store_{key}')
+            if account_info:
+                account_info = json.loads(account_info)
+                return Response(data=account_info, status=status.HTTP_200_OK)
+            else:
+                return Response(data=f"查询结果为空", status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(data=f"查询失败：{e}", status=status.HTTP_200_OK)
+```
+
+#### 8. Postman 的使用
+
+```bash
+# 注意获取前端的参数是写在 URL 上的。尝试将 18 改成任何其他的内容查看结果
+重启项目 -> 打开 Postman -> GET 请求 -> http://127.0.0.1:8080/store/store_account/?key=18 -> 点击 Send -> 查看结果
 ```
 
