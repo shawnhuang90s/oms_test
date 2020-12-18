@@ -1,8 +1,7 @@
 from django.db import models
-from utils.base_model import BaseModel
 
 
-class Store(BaseModel):
+class Store(models.Model):
     """店铺模型类"""
 
     STATUS_CHOICES = (

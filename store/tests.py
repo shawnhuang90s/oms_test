@@ -1,4 +1,8 @@
 from datetime import datetime
+import os, django
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
+django.setup()
 from store.models import Store
 
 
@@ -16,8 +20,6 @@ def batch_create01():
             market_id=i,
             status=1,
             last_download_time=datetime.now(),
-            create_time=datetime.now(),
-            update_time=datetime.now(),
         )
         print(f'新建数据：{store_dict}')
         Store.objects.create(**store_dict)
@@ -39,8 +41,6 @@ def batch_create02():
             market_id=i,
             status=1,
             last_download_time=datetime.now(),
-            create_time=datetime.now(),
-            update_time=datetime.now(),
         )
         print(f'新建数据：{store_dict}')
         try:
@@ -67,22 +67,17 @@ def batch_create03():
             market_id=i,
             status=1,
             last_download_time=datetime.now(),
-            create_time=datetime.now(),
-            update_time=datetime.now(),
         )
         # print(f'新建数据：{store_dict}')
         store_list.append(Store(**store_dict))
-    # batch_size 表示每次批量处理的数量  ignore_conflicts=True 表示忽略批量创建时的冲突
+    # batch_size 表示每次批量处理的数量
+    # ignore_conflicts=True 表示忽略批量创建时的冲突
     Store.objects.bulk_create(store_list, batch_size=100, ignore_conflicts=True)
 
     return
 
 
 if __name__ == '__main__':
-    import os, django
-    if not os.environ.get('DJANGO_SETTINGS_MODULE'):
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
-    django.setup()
     # batch_create01()
     # batch_create02()
     batch_create03()

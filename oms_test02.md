@@ -178,9 +178,8 @@ class BaseModel(models.Model):
 
 ```python
 from django.db import models
-from utils.base_model import BaseModel
 
-class Store(BaseModel):
+class Store(models.Model):
     """店铺模型类"""
 
     STATUS_CHOICES = (
@@ -208,6 +207,7 @@ class Store(BaseModel):
 
     class Meta:
         # 告诉 Django 不要管理这个模型类的创建, 修改和删除
+        # 当然，如果设置为 False，则数据库针对这个表要自己新建，而不是靠在项目中迁移数据库
         # 想要允许 Django 管理这个模型类的生命周期, 直接删掉它(因为 True 是默认值)
         managed = False
         # 指明该模型类属于 store 这个子应用
@@ -248,8 +248,6 @@ create table `oms_store` (
   `market_id` int(11) default null comment '站点ID',
   `status` tinyint(2) default null comment '店铺状态',
   `last_download_time` datetime default null comment '上次抓单时间',
-  `create_time` datetime default null comment '创建时间',
-  `update_time` datetime default null comment '更新时间',
   primary key (`id`)
 ) engine=InnoDB default charset=utf8 comment '店铺表';
 ```
@@ -263,6 +261,10 @@ create table `oms_store` (
 ```python
 # oms_test/store/tests.py
 from datetime import datetime
+import os, django
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
+django.setup()
 from store.models import Store
 
 
@@ -280,8 +282,6 @@ def batch_create():
             market_id=i,
             status=1,
             last_download_time=datetime.now(),
-            create_time=datetime.now(),
-            update_time=datetime.now(),
         )
         print(f'新建数据：{store_dict}')
         Store.objects.create(**store_dict)
@@ -290,10 +290,6 @@ def batch_create():
 
 
 if __name__ == '__main__':
-    import os, django
-    if not os.environ.get('DJANGO_SETTINGS_MODULE'):
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
-    django.setup()
     batch_create()
 ```
 
@@ -319,6 +315,10 @@ truncate table oms_store;
 ```python
 # oms_test/store/tests.py
 from datetime import datetime
+import os, django
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
+django.setup()
 from store.models import Store
 
 
@@ -336,8 +336,6 @@ def batch_create01():
             market_id=i,
             status=1,
             last_download_time=datetime.now(),
-            create_time=datetime.now(),
-            update_time=datetime.now(),
         )
         print(f'新建数据：{store_dict}')
         Store.objects.create(**store_dict)
@@ -359,8 +357,6 @@ def batch_create02():
             market_id=i,
             status=1,
             last_download_time=datetime.now(),
-            create_time=datetime.now(),
-            update_time=datetime.now(),
         )
         print(f'新建数据：{store_dict}')
         try:
@@ -372,10 +368,6 @@ def batch_create02():
     return
 
 if __name__ == '__main__':
-    import os, django
-    if not os.environ.get('DJANGO_SETTINGS_MODULE'):
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
-    django.setup()
     # batch_create01()
     batch_create02()
 ```
@@ -393,6 +385,10 @@ if __name__ == '__main__':
 ```python
 # oms_test/store/tests.py
 from datetime import datetime
+import os, django
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
+django.setup()
 from store.models import Store
 
 
@@ -410,8 +406,6 @@ def batch_create01():
             market_id=i,
             status=1,
             last_download_time=datetime.now(),
-            create_time=datetime.now(),
-            update_time=datetime.now(),
         )
         print(f'新建数据：{store_dict}')
         Store.objects.create(**store_dict)
@@ -433,8 +427,6 @@ def batch_create02():
             market_id=i,
             status=1,
             last_download_time=datetime.now(),
-            create_time=datetime.now(),
-            update_time=datetime.now(),
         )
         print(f'新建数据：{store_dict}')
         try:
@@ -461,8 +453,6 @@ def batch_create03():
             market_id=i,
             status=1,
             last_download_time=datetime.now(),
-            create_time=datetime.now(),
-            update_time=datetime.now(),
         )
         # print(f'新建数据：{store_dict}')
         store_list.append(Store(**store_dict))
@@ -473,32 +463,152 @@ def batch_create03():
 
 
 if __name__ == '__main__':
-    import os, django
-    if not os.environ.get('DJANGO_SETTINGS_MODULE'):
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
-    django.setup()
     # batch_create01()
     # batch_create02()
     batch_create03()
 ```
 
-### Redis 集群
+### Ubuntu 中 Redis 集群的创建
 
-#### 1. CentOS7 下载/安装/启动 Redis 
+>参考资料：https://blog.csdn.net/qq_40423339/article/details/102655796
+
+#### 1. 安装 Redis 
+
+```bash
+# 切换到家目录，下载 Redis 包
+cd
+sudo wget https://download.redis.io/releases/redis-6.0.9.tar.gz
+# 将其移到 /opt 目录下
+sudo mv redis-6.0.9.tar.gz /opt
+# 解压
+cd /opt
+sudo tar -zxvf redis-6.0.9.tar.gz
+# 进入目录并进行编译安装
+cd redis-6.0.9/
+sudo apt-get install gcc
+sudo make
+sudo make install
+```
+
+#### 2. 启动 Redis
+
+```bash
+# 新建 redis 目录
+sudo mkdir /etc/redis
+# 复制解压后目录下的配置文件到 /etc/redis 下并重命名为 6379.conf
+sudo cp redis.conf /etc/redis/6379.conf
+# 编辑该文件，将 daemonize no 修改为 daemonize yes，保存退出
+sudo vim /etc/redis/redis.conf
+# 启动 Redis 服务
+sudo /usr/local/bin/redis-server /etc/redis/6379.conf
+# 进入 Redis 并测试（结果为 PONG)
+redis-cli
+ping
+exit
+# 查看 redis 进程
+ps -ef | grep redis
+# 使用 sh 命令开启 redis，新建 redis.sh 文件
+cd
+vim redis.sh
+# 添加以下内容，保存退出
+#!/bin/sh
+sudo /usr/local/bin/redis-server /etc/redis/6379.conf
+ps -ef | grep redis
+# 测试
+sh redis.sh
+```
+
+#### 3. 配置 Redis 集群
+
+```bash
+# 以家目录为例
+cd /etc/redis
+# 复制 Redis 配置文件到这六个目录下并重命名
+sudo cp 6379.conf 7101.conf
+sudo cp 6379.conf 7102.conf
+sudo cp 6379.conf 7103.conf
+sudo cp 6379.conf 7104.conf
+sudo cp 6379.conf 7105.conf
+sudo cp 6379.conf 7106.conf
+# 分别修改这六个配置文件内容，除了端口不一样，其他内容保持一致
+# 因为配置文件内容较多，可以先查找对应的内容
+# 示例：vim redis-7101.conf
+# 按 Esc，shift+?，输入 port，按 n 查找下一个 port
+
+port 7101
+# 因为在本机部署测试，所以 bind 127.0.0.1 即可
+daemonize yes
+pidfile /var/run/redis_7101.pid
+cluster-enabled yes
+cluster-config-file nodes-7101.conf
+cluster-node-timeout 15000
+appendonly yes
+```
+
+#### 4. 启动 Redis 集群服务
+
+```bash
+# 直接编写一个 sh 文件来启动 Redis
+cd
+vim redis.sh
+# 添加以下内容：
+#!/bin/sh
+sudo redis-server /etc/redis/6379.conf
+sudo redis-server /etc/redis/7101.conf
+sudo redis-server /etc/redis/7102.conf
+sudo redis-server /etc/redis/7103.conf
+sudo redis-server /etc/redis/7104.conf
+sudo redis-server /etc/redis/7105.conf
+sudo redis-server /etc/redis/7106.conf
+ps -ef | grep redis
+
+# 测试
+sh redis.sh
+
+# 安装 Ruby 环境
+sudo apt-get update
+sudo apt-get install ruby
+
+# 使用 redis-trib.rb 命令创建集群
+sudo cp /usr/share/doc/redis-tools/examples/redis-trib.rb /usr/local/bin/
+redis-trib.rb create --replicas 1 127.0.0.1:7101 127.0.0.1:7102 127.0.0.1:7103 127.0.0.1:7104 127.0.0.1:7105 127.0.0.1:7106
+```
+
+#### 5. 进入集群
+
+```bash
+# 随便进入某个节点
+redis-cli -h 127.0.0.1 -p 7101 -c
+127.0.0.1:7101> set name 'test'
+-> Redirected to slot [5798] located at 127.0.0.1:7102
+OK
+127.0.0.1:7102> get name
+"test"
+127.0.0.1:7102>exit
+
+# 进入另一个节点，发现也可以获取在上面节点设置的值
+redis-cli -h 127.0.0.1 -p 7106 -c
+127.0.0.1:7106> get name
+-> Redirected to slot [5798] located at 127.0.0.1:7102
+"test"
+127.0.0.1:7102> exit
+```
+
+### CentOS7 中 Redis 集群的创建
+
+> 参考资料：https://www.cnblogs.com/zuidongfeng/p/8032505.html
+
+#### 1. 安装 Redis
 
 ```bash
 # 下载 Redis 包
 wget https://download.redis.io/releases/redis-6.0.9.tar.gz
-```
-
-#### 2. 安装 Redis
-
-> 参考资料：https://www.cnblogs.com/zuidongfeng/p/8032505.html
-
-```bash
+# 将安装包移到 /opt
+mv redis-6.0.9.tar.gz /opt
 # 安装依赖包
 yum install gcc
 # 解压
+cd /opt/
 tar -zxvf redis-6.0.9.tar.gz
 # 切换到解压后的 Redis 目录
 cd redis-6.0.9
@@ -515,7 +625,7 @@ scl enable devtoolset-8 bash
 gcc -v
 # 把 redis-6.0.9 文件夹删除
 # 因为刚才编译的时候可能有残余文件，可能导致后面的编译失败
-cd ..
+cd /opt
 rm -rf redis-6.0.9/
 tar -zxvf redis-6.0.9.tar.gz
 cd redis-6.0.9/
@@ -529,178 +639,148 @@ cd src/
 make install
 ```
 
-#### 3. 启动 Redis
+#### 2. 启动 Redis
 
 ```bash
-# 启动 Redis，这种方式要一直占着窗口，显然不太好
-./redis-server
-# 按 ctrl+c 关闭，接下来，以后台进程方式启动 Redis
-cd ..
-ls
-vim redis.conf
-# 将 daemonize no 改为 daemonize yes，保存退出
-# 查看当前绝对路径并复制
-pwd
-cd src
-# 指定 redis.conf 文件启动 
-./redis-server /root/redis-6.0.9/redis.conf
+# 新建 redis 目录
+sudo mkdir /etc/redis
+# 复制解压后目录下的配置文件到 /etc/redis 下并重命名为 6379.conf
+sudo cp /opt/redis-6.0.9/redis.conf /etc/redis/6379.conf
+# 编辑该文件，将 daemonize no 修改为 daemonize yes，保存退出
+sudo vim /etc/redis/6379.conf
+# 启动 Redis 服务
+sudo /usr/local/bin/redis-server /etc/redis/6379.conf
+# 进入 Redis 并测试（结果为 PONG)
+redis-cli
+ping
+exit
 # 查看 redis 进程
 ps -ef | grep redis
-# 发现 Redis 在后台已经启动
 ```
 
-#### 4. 设置 Redis 开机自动启动
+#### 3. 设置 Redis 以服务命令形式启动
 
 ```bash
-# 在 /etc 目录下新建 redis 目录
-cd /etc
-mkdir redis
-# 将上面解压后的 Redis 文件夹下的 redis.conf 文件（注意每个人的安装路径可能不一样）复制一份到 /etc/redis 目录下，并命名为6379.conf
-cp /root/redis-6.0.9/redis.conf /etc/redis/6379.conf
-# 检查是否复制并重命名成功
-cd redis/
-ls
 # 将 Redis 的启动脚本复制一份放到 /etc/init.d 目录下
-cp /root/redis-6.0.9/utils/redis_init_script /etc/init.d/redis
+cp /root/redis-6.0.9/utils/redis_init_script /etc/init.d/redisd
 # 切换到 init.d 目录下执行自启命令
 cd /etc/init.d/
-chkconfig redis on
+chkconfig redisd on
 # 如果报错：service redisd does not support chkconfig
 # 编辑 /etc/init.d/redis 文件，第一行加入两行注释, 报错并退出
 # 注释的意思是：Redis服务必须在运行级 2，3，4，5 下被启动或关闭，启动的优先级是 90，关闭的优先级是 10
 # chkconfig:   2345 90 10
 # description:  Redis is a persistent key-value database
 
-# PS：Ubuntu 中安装 chkconfig 方法
-sudo apt install sysv-rc-conf
-sudo cp /usr/sbin/sysv-rc-conf /usr/sbin/chkconfig
-```
-
-#### 5. 尝试以服务形式启动和关闭 Redis
-
-```bash
-# 开启
-service redis start
+# 尝试以服务形式关闭和开启 Redis
+ps -ef | grep redis
 # 关闭
-service redis stop
+service redisd stop
+Stopping ...
+Redis stopped
+ps -ef | grep redis
+# 开启
+service redisd start
+Starting Redis server...
+# 再次查看是否有 Redis 进程
+ps -ef | grep redis
 ```
 
-#### 6. 搭建 Redis 集群
-
-> 参考资料：https://www.cnblogs.com/yushangzuiyue/p/9305586.html
+#### 4. 配置 Redis 集群
 
 ```bash
-# 我这里将 Redis 解压在家目录下，因此先切换到家目录
-# 为方便测试，我把 Redis 集群相关文件也放在家目录下
-cd ~
-mkdir redis-cluster
-cd redis-cluster/
-mkdir 7101 7102 7103 7104 7105 7106
-# 将上面解压后的 Redis 目录下 src 里的 redis-server 文件复制到这三个目录下
-cp /root/redis-6.0.9/src/redis-server 7101/
-cp /root/redis-6.0.9/src/redis-server 7102/
-cp /root/redis-6.0.9/src/redis-server 7103/
-cp /root/redis-6.0.9/src/redis-server 7104/
-cp /root/redis-6.0.9/src/redis-server 7105/
-cp /root/redis-6.0.9/src/redis-server 7106/
-# 在每个新建的目录下新增 redis.conf 文件
-vim 7101/redis.conf
-# 添加如下内容，7102/7103 的方法一样，对应修改端口就行
+cd /etc/redis
+# 复制 Redis 配置文件到这六个目录下并重命名
+sudo cp 6379.conf 7101.conf
+sudo cp 6379.conf 7102.conf
+sudo cp 6379.conf 7103.conf
+sudo cp 6379.conf 7104.conf
+sudo cp 6379.conf 7105.conf
+sudo cp 6379.conf 7106.conf
+# 分别修改这六个配置文件内容，除了端口不一样，其他内容保持一致
+# 因为配置文件内容较多，可以先查找对应的内容
+# 示例：vim redis-7101.conf
+# 按 Esc，shift+?，输入 port，按 n 查找下一个 port
+
 port 7101
+# 因为在本机部署测试，所以 bind 127.0.0.1 即可
 daemonize yes
-# bind 192.168.253.135  # 绑定对外连接提供的 IP
-# pidfile 7000.pid  # 进程文件名
+pidfile /var/run/redis_7101.pid
 cluster-enabled yes
 cluster-config-file nodes-7101.conf
-cluster-node-timeout 5000
+cluster-node-timeout 15000
 appendonly yes
-# 分别启动这三个目录下的 Redis 服务
-cd 7101/
-./redis-server ./redis.conf
-cd ..
-cd 7102/
-./redis-server ./redis.conf
-cd ..
-cd 7103/
-./redis-server ./redis.conf
-# 查看 Redis 服务进程
-ps -ef | grep redis-server
-root      4821     1  0 15:11 ?        00:00:02 /usr/local/bin/redis-server 127.0.0.1:6379
-root     15765     1  0 16:08 ?        00:00:00 ./redis-server *:7101 [cluster]
-root     16070     1  0 16:10 ?        00:00:00 ./redis-server *:7102 [cluster]
-root     16113     1  0 16:10 ?        00:00:00 ./redis-server *:7103 [cluster]
-root     18513     1  0 16:22 ?        00:00:00 ./redis-server *:7104 [cluster]
-root     18548     1  0 16:22 ?        00:00:00 ./redis-server *:7105 [cluster]
-root     18583     1  0 16:22 ?        00:00:00 ./redis-server *:7106 [cluster]
-root     16239 15208  0 16:10 pts/0    00:00:00 grep --color=auto redis-server
+```
+
+#### 5. 启动 Redis 集群服务
+
+```bash
+# 直接编写一个 sh 文件来启动 Redis
+cd
+vim redis.sh
+# 添加以下内容：
+#!/bin/sh
+sudo redis-server /etc/redis/6379.conf
+sudo redis-server /etc/redis/7101.conf
+sudo redis-server /etc/redis/7102.conf
+sudo redis-server /etc/redis/7103.conf
+sudo redis-server /etc/redis/7104.conf
+sudo redis-server /etc/redis/7105.conf
+sudo redis-server /etc/redis/7106.conf
+ps -ef | grep redis
+
+# 测试
+sh redis.sh
+
 # 安装 Ruby
 yum install ruby
-# 创建 Redis 集群（Ubuntu 貌似不用这一步？）
-cd ~
+
+# 创建 Redis 集群
 # --cluster-replicas 1 表示从机数量
 redis-cli --cluster create 127.0.0.1:7101 127.0.0.1:7102 127.0.0.1:7103 127.0.0.1:7104 127.0.0.1:7105 127.0.0.1:7106 --cluster-replicas 1
-# 如果 Redis 版本更低，比如是 4.0 版本的，创建集群命令示例：
-# ./redis-trib.rb create --replicas 1 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 127.0.0.1:7004 127.0.0.1:7005
-# 测试进入某个集群点
-redis-cli -c -p 7101
+```
+
+#### 6. 进入集群
+
+```bash
+# 随便进入某个节点
+redis-cli -h 127.0.0.1 -p 7101 -c
 # 查看集群信息
 127.0.0.1:7101> cluster info
 cluster_state:ok
 ......
+# 设置一个值
+127.0.0.1:7101> set name 'test'
+-> Redirected to slot [5798] located at 127.0.0.1:7102
+OK
+# 获取该值
+127.0.0.1:7102> get name
+"test"
+127.0.0.1:7102>exit
+
+# 进入另一个节点，发现也可以获取在上面节点设置的值
+redis-cli -h 127.0.0.1 -p 7106 -c
+127.0.0.1:7106> get name
+-> Redirected to slot [5798] located at 127.0.0.1:7102
+"test"
+127.0.0.1:7102> exit
+
 # 如果 IP 地址是某个服务器的，这样测试：
 redis-cli -c -h 192.168.199.135 -p 7101
 # 如果要增加节点，可以这样：
-redis-cli --cluster add-node 127.0.0.1:7106 127.0.0.1:7107
+redis-cli --cluster add-node 127.0.0.1:7107 127.0.0.1:7108
 ```
 
-#### 7. 使用脚本启动 Redis 方法
+### 将各平台店铺账户信息保存进 Redis 
 
-```bash
-# 比如我的 Ubuntu 系统中，Redis 下载安装在家目录下
-# 新建一个 sh 文件
-vim start_redis.sh
-# 添加以下内容，保存退出
-#!/bin/sh
-
-cd /home/yanfa/redis-6.0.9/src
-./redis-server ../redis.conf
-cd /home/yanfa/redis-cluster/7101
-./redis-server ./redis.conf
-cd /home/yanfa/redis-cluster/7102
-./redis-server ./redis.conf
-cd /home/yanfa/redis-cluster/7103
-./redis-server ./redis.conf
-cd /home/yanfa/redis-cluster/7104
-./redis-server ./redis.conf
-cd /home/yanfa/redis-cluster/7105
-./redis-server ./redis.conf
-cd /home/yanfa/redis-cluster/7106
-./redis-server ./redis.conf
-
-ps -ef | grep redis
-
-# 每次开机后直接执行该文件即可
-sh start_redis.sh
-# 执行结果：
-yanfa     6424  3633  0 17:04 ?        00:00:01 ./redis-server 127.0.0.1:6379
-yanfa     6544  3633  0 17:08 ?        00:00:00 ./redis-server *:7101 [cluster]
-yanfa     6617  3633  0 17:14 ?        00:00:00 ./redis-server *:7102 [cluster]
-yanfa     6623  3633  0 17:14 ?        00:00:00 ./redis-server *:7103 [cluster]
-yanfa     6629  3633  0 17:14 ?        00:00:00 ./redis-server *:7104 [cluster]
-yanfa     6635  3633  0 17:14 ?        00:00:00 ./redis-server *:7105 [cluster]
-yanfa     6641  3633  0 17:14 ?        00:00:00 ./redis-server *:7106 [cluster]
-yanfa     6797 31557  0 17:19 pts/22   00:00:00 sh start_redis.sh
-yanfa     6813  6797  0 17:19 pts/22   00:00:00 grep redis
-```
-
-#### 8. 项目中安装 Redis 和 RedisCluster
+#### 1. 项目中安装 Redis 和 RedisCluster
 
 ```bash
 pip install redis
 pip install redis-py-cluster
 ```
 
-#### 9. 配置文件夹 oms_conf 中新增 oms_redis.py 文件
+#### 2. 配置文件夹 oms_conf 中新增 oms_redis.py 文件
 
 ```python
 from rediscluster import RedisCluster
@@ -725,35 +805,78 @@ class RedisConf:
 REDIS_CONF = RedisConf()
 ```
 
-#### 10. 项目中新建一个专门存放对外 API 接口的子应用
-
-```bash
-# Pycharm 终端项目根目录下新建子应用
-# 因为这里的内容都是接口信息，因此删掉用不上的文件 admin.py/models.py/tests.py
-python manage.py startapp interface_api
-
-# 项目配置文件中添加子应用
-# oms_test/oms_test/settings.py
-INSTALLED_APPS = [
-    ......
-    # 自建应用
-    'interface_api.apps.InterfaceApiConfig',
-]
-```
-
-#### 11. 安装 rest_framework
-
-```bash
-pip install django-rest-framework
-```
-
-#### 1. Redis 查询接口
+#### 3. 项目配置文件中导入 Redis 集群配置内容
 
 ```python
 # oms_test/oms_test/settings.py
 from oms_conf import oms_db, oms_redis
 REDIS_CONF = oms_redis.REDIS_CONF
+```
 
-# oms_test/intercept_api/views.py
+#### 4. 安装 rest_framework
+
+```bash
+pip install django-rest-framework
+```
+
+#### 5. 尝试在项目中将店铺数据写入到 Redis 集群中
+
+```python
+# oms_test/utils/redis_info.py
+import json
+from oms_test.settings import REDIS_CONF
+redis_conn = REDIS_CONF.redis_conn
+
+
+def set_store_account():
+    """保存店铺账户信息到 Redis 集群中"""
+    store_account_key = REDIS_CONF.store_account_key
+    print('======== 获取各平台店铺账户信息并保存到 Redis 集群 ========')
+    for i in range(1, 21):
+        # 以下数据只是测试所用, 真实数据肯定不是这样
+        # Cdiscount 平台店铺账户信息
+        cdiscount_dict = dict(
+            username=f'username_{i}',
+            password=f'password_{i}'
+        )
+        # Cdisount 平台店铺名称
+        cd_key = f'cd_store_{i}'
+        # 将店铺名与对应的账户信息保存进 Redis 中
+        redis_conn.hset(cd_key, store_account_key, json.dumps(cdiscount_dict))
+    print('======== 保存成功 ========')
+
+    return
+
+
+if __name__ == '__main__':
+    set_store_account()
+
+# 运行该文件，结果：
+======== 获取各平台店铺账户信息并保存到 Redis 集群 ========
+======== 保存成功 ========
+```
+
+#### 6. 进入 Redis 集群，查看刚才保存的值是否能获取到
+
+```bash
+redis-cli -h 127.0.0.1 -p 7101 -c
+127.0.0.1:7101> hget cd_store_1 store_account_info
+"{\"username\": \"username_1\", \"password\": \"password_1\"}"
+127.0.0.1:7101> 
+
+# 项目中查询
+if __name__ == '__main__':
+    # set_store_account()
+    store_account_key = REDIS_CONF.store_account_key
+    for i in range(1, 21):
+        cd_key = f'cd_store_{i}'
+        store_obj = redis_conn.hget(cd_key, store_account_key)
+        print(store_obj)
+
+# 运行结果：
+{"username": "username_1", "password": "password_1"}
+{"username": "username_2", "password": "password_2"}
+{"username": "username_3", "password": "password_3"}
+......
 ```
 

@@ -19,7 +19,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # 自建应用
-    'interface_api.apps.InterfaceApiConfig',
     'store.apps.StoreConfig',
 ]
 

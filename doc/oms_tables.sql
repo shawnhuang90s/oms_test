@@ -10,7 +10,5 @@ create table `oms_store` (
   `market_id` int(11) default null comment '站点ID',
   `status` tinyint(2) default null comment '店铺状态',
   `last_download_time` datetime default null comment '上次抓单时间',
-  `create_time` datetime default null comment '创建时间',
-  `update_time` datetime default null comment '更新时间',
   primary key (`id`)
 ) engine=InnoDB default charset=utf8 comment '店铺表';
