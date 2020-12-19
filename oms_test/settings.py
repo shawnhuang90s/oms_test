@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from oms_conf import oms_db, oms_redis
 
@@ -16,7 +17,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',
+    # 'django.contrib.staticfiles',
 
     # 自建应用
     'store.apps.StoreConfig',
@@ -80,5 +81,6 @@ USE_L10N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
+API_DOC_ROOT = os.path.join(BASE_DIR, 'api_doc/')
 
 REDIS_CONF = oms_redis.REDIS_CONF

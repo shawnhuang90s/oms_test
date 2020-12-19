@@ -1069,7 +1069,7 @@ class StoreAccountView(APIView):
                 account_info = json.loads(account_info)
                 return Response(data=account_info, status=status.HTTP_200_OK)
             else:
-                return Response(data=f"查询结果为空", status=status.HTTP_200_OK)
+                return Response(data=f"Redis中没有店铺ID:{key} 对应的账户信息", status=status.HTTP_200_OK)
         except Exception as e:
             return Response(data=f"查询失败：{e}", status=status.HTTP_200_OK)
 ```

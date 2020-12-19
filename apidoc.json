@@ -1,0 +1,12 @@
+{
+  "name": "OMS API DOCUMENTS",
+  "version": "1.0.0",
+  "description": "订单管理系统前后端联调的接口文档",
+  "title": "API接口文档",
+  "url" : "https://127.0.0.1:8080",
+  "template": {
+    "withCompare": true,
+    "withGenerator": true,
+    "aloneDisplay": false
+  }
+}
