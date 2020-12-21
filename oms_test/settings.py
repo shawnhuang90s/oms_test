@@ -21,6 +21,8 @@ INSTALLED_APPS = [
 
     # 自建应用
     'store.apps.StoreConfig',
+    'user.apps.UserConfig',
+    'system.apps.SystemConfig',
 ]
 
 MIDDLEWARE = [
@@ -84,3 +86,11 @@ STATIC_URL = '/static/'
 API_DOC_ROOT = os.path.join(BASE_DIR, 'api_doc/')
 
 REDIS_CONF = oms_redis.REDIS_CONF
+
+REST_FRAMEWORK = {
+    # 全局设置, 默认所有接口都需要被验证
+    'DEFAULT_PERMISSION_CLASSES': (
+        'utils.permissions.APIPermission',
+        'utils.permissions.IsIdempotent',
+    ),
+}

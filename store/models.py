@@ -3,7 +3,6 @@ from django.db import models
 
 class Store(models.Model):
     """店铺模型类"""
-
     STATUS_CHOICES = (
         (0, '关闭弃号'),
         (1, '正常可售'),

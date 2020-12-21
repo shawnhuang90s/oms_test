@@ -151,7 +151,7 @@ INSTALLED_APPS = [
 
 #### 2. 新建 Store 模型类
 
-新建一个抽象基类
+新建一个抽象基类（暂时不需要，备用）
 
 ```python
 # oms_test/utils/base_model
@@ -206,15 +206,19 @@ class Store(models.Model):
     last_download_time = models.DateTimeField(null=True, blank=True, verbose_name='上次抓单时间')
 
     class Meta:
-        # 告诉 Django 不要管理这个模型类的创建, 修改和删除
-        # 当然，如果设置为 False，则数据库针对这个表要自己新建，而不是靠在项目中迁移数据库
-        # 想要允许 Django 管理这个模型类的生命周期, 直接删掉它(因为 True 是默认值)
         managed = False
         # 指明该模型类属于 store 这个子应用
         app_label = 'store'
         db_table = 'oms_store'
         verbose_name = verbose_name_plural = '店铺表'
 ```
+
+managed = False 的相关解释：
+
+- 设置为 False 是告诉 Django 不要管理这个模型类的创建、修改和删除
+- 当然，如果设置为 False，则需要在数据库手动创建这个表，而不是靠在项目中迁移数据库自动创建
+- 如果想要允许 Django 管理这个模型类的生命周期，直接不要设置这个属性值即可（因为 True 是默认值）
+- 一般来说，项目中数据库数据的增删改查操作比较敏感的，尤其是对某个表的数据进行删除，或者新增、删除某个字段时必须申请，一般也有专人来管理数据库的数据
 
 #### 3. 迁移数据库
 
@@ -252,7 +256,7 @@ create table `oms_store` (
 ) engine=InnoDB default charset=utf8 comment '店铺表';
 ```
 
-复制上面的 SQL 语句，点击 Pycharm 中 Database 上面的 QL 小图标，选择 'Console(default)'，会自动打开一个窗口：oms_test@localhost[console]
+复制上面的 SQL 语句，点击 Pycharm 中 Database 上面的 QL 小图标，选择 'oms_test@localhost[console]'，会自动打开一个页面：oms_test@localhost[console]
 
 粘贴，将鼠标光标停留在这个语句里的某个位置，左击，然后再点击左上角的绿色三角形按钮即可执行该条 SQL 语句，下方会弹出一个窗口，显示建表过程
 
