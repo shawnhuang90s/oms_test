@@ -267,7 +267,7 @@ REST_FRAMEWORK = {
 }
 ```
 
-测试权限验证是否生效：重启项目，Postman 运行 Redis 查询接口：http://127.0.0.1:8080/store/store_account/?key=2，Pycharm 下方的 Run 窗口查询打印信息，说明该接口走了权限验证方法
+测试权限验证是否生效：重启项目，Postman 运行 Redis 查询接口：http://127.0.0.1:8080/store/store_account/?key=2，Pycharm 下方的 Run 窗口查询打印信息（AnonymousUser），说明该接口走了权限验证方法
 
 ```python
 Performing system checks...
@@ -282,7 +282,379 @@ AnonymousUser
 [21/Dec/2020 03:54:30] "GET /store/store_account/?key=2 HTTP/1.1" 200 49
 ```
 
+### kafka 的基本使用和单机伪集群搭建
 
+Ubuntu 和 CentOS7 的步骤一样，只不过这里把下载的文件上传到了 CentOS7 中
+
+#### 1. 下载 JDK
+
+本次示例是在 Ubuntu 系统先下载 JDK，然后上传到 CentOS7 云服务器
+
+>下载地址：https://www.oracle.com/java/technologies/javase-jdk15-downloads.html
+>
+>参考资料：https://blog.csdn.net/lumping/article/details/108552042
+
+```bash
+scp -r jdk-15.0.1_linux-x64_bin.tar.gz root@182.254.177.42:/opt
+```
+
+登录到云服务器后，查看家目录，发现有该文件了
+
+#### 2. 安装 kafka
+
+```bash
+# 把家目录下的压缩文件移至 /opt 目录下
+mv jdk-15.0.1_linux-x64_bin.tar.gz /opt
+cd /opt
+ls
+tar -zxvf jdk-15.0.1_linux-x64_bin.tar.gz
+ls
+```
+
+#### 3. 配置 JDK 环境变量
+
+> 参考资料：https://cloud.tencent.com/developer/article/1558419
+
+```bash
+vim /etc/profile
+# 添加以下内容，注意路径
+export JAVA_HOME=/opt/jdk-15.0.1
+export CLASSPATH=.:${JAVA_HOME}/jre/lib/rt.jar:${JAVA_HOME}/lib/dt.jar:${JAVA_HOME}/lib/tools.jar
+export PATH=$PATH:${JAVA_HOME}/bin
+# 保存退出后激活配置
+source /etc/profile
+# 查看是否生效
+java -version
+```
+
+#### 4. 官网下载并解压 kafka
+
+>参考资料：http://kafka.apache.org/quickstart
+
+同样是从 Ubuntu 下载后上传到 CentOS7 中
+
+```bash
+# Ubuntu 家目录
+scp -r kafka_2.13-2.7.0.tgz root@182.254.177.42:/opt/
+ls
+# CentOS7
+cd /opt
+ls
+tar -zxvf kafka_2.13-2.7.0.tgz
+```
+
+#### 5. 启动 zookeeper 和 kafka
+
+```bash
+cd kafka_2.13-2.7.0/
+bin/zookeeper-server-start.sh config/zookeeper.properties &
+bin/kafka-server-start.sh config/server.properties &
+```
+
+#### 6. 创建一个主题 quickstart-events
+
+```bash
+bin/kafka-topics.sh --create --topic quickstart-events --bootstrap-server localhost:9092
+```
+
+#### 7. 查看新主题的分区数
+
+```bash
+bin/kafka-topics.sh --describe --topic quickstart-events --bootstrap-server localhost:9092
+```
+
+#### 8. 自主创建生产-消费者模型
+
+```bash
+# 生产消息，随便输入几行内容
+bin/kafka-console-producer.sh --topic quickstart-events --bootstrap-server localhost:9092
+# 消费消息，发现接收到了上面生产者消息
+bin/kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server localhost:9092
+# 这里可以分开两个终端来执行，这样只有生产者发出消息了，消费者就会立即收到该消息
+```
+
+#### 10. 删除本地 kafka 环境的任何数据
+
+```bash
+# 查看 zookeeper 进程并杀死
+ps -ef | grep zookeeper
+kill -9 端口号
+# 删除临时文件
+rm -rf /tmp/kafka-logs /tmp/zookeeper
+```
+
+#### 11. 单机伪集群配置
+
+##### 1) 复制两份服务配置文件
+
+```bash
+cp config/server.properties config/server-1.properties 
+cp config/server.properties config/server-2.properties 
+```
+
+##### 2) 修改配置信息
+
+```bash
+vim config/server-1.properties 
+# 找到下面字段并修改相关属性, 没找到就加进去, 保存退出
+broker.id=1
+# 允许使用命令删除 topic
+delete.topic.enable=true
+listeners=PLAINTEXT://127.0.0.1:9093
+log.dirs=/tmp/kafka-logs-1
+
+# server-2.properties 文件同理
+vim config/server-2.properties 
+broker.id=2
+delete.topic.enable=true
+listeners=PLAINTEXT://127.0.0.1:9094
+log.dirs=/tmp/kafka-logs-2
+```
+
+##### 3) 启动这两个服务
+
+```bash
+# 前面已经杀死了 zookeeper 进程，这里要重启该服务
+bin/zookeeper-server-start.sh config/zookeeper.properties &
+bin/kafka-server-start.sh config/server-1.properties &
+bin/kafka-server-start.sh config/server-2.properties &
+
+# 如果启动时报错如下
+kafka.common.InconsistentClusterIdException: The Cluster ID eUIrXKEBRpqak960NpJkTg doesn't match stored clusterId Some(aAs_yU0HSN6GLYkKKwrDlA) in meta.properties. The broker is trying to join the wrong cluster. Configured zookeeper.connect may be wrong.
+# 解决办法：杀死所有 zookeeper 端口号
+ps -ef | grep zookeeper
+kill -9 端口号
+
+# 查看是否还有 zookeeper 和 java 进程
+ps -ef | grep zookeeper
+ps -ef | grep java
+# 删除临时日志文件
+rm -rf /tmp/kafka-logs /tmp/kafka-logs-1 /tmp/kafka-logs-2 /tmp/zookeeper
+
+# 重新启动 zookeeper 和 kafka
+bin/zookeeper-server-start.sh config/zookeeper.properties &
+bin/kafka-server-start.sh config/server-1.properties &
+bin/kafka-server-start.sh config/server-2.properties &
+
+# 查看相关端口号
+netstat -unltp | grep 909*
+tcp6       0      0 127.0.0.1:9093          :::*                    LISTEN      3953/java           
+tcp6       0      0 127.0.0.1:9094          :::*                    LISTEN      4387/java
+```
+
+##### 4) 创建一个主题 test_topic
+
+```bash
+# 因为我们现在开启了两个服务，所以 --replication-factor 对应 2
+bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 2 --partitions 1 --topic test_topic
+```
+
+##### 5) 查看新主题的分区数
+
+```bash
+bin/kafka-topics.sh --describe --zookeeper localhost:2181 --topic test_topic
+```
+
+##### 6) 自主创建生产-消费者模型
+
+```bash
+# 在 9093 端口生产消息，随便输入几行内容
+bin/kafka-console-producer.sh --topic my-replicated-topic --bootstrap-server localhost:9093
+# 在 9094 消费消息，发现接收到了上面 9093 端口生产者消息
+bin/kafka-console-consumer.sh --topic my-replicated-topic --from-beginning --bootstrap-server localhost:9094
+```
+
+##### 7) 删除 test_topic
+
+```bash
+bin/kafka-topics.sh --delete --topic test_topic --zookeeper localhost:2181
+```
+
+### Pykafka 的使用
+
+#### 1. 安装 pykafka
+
+```bash
+pip install pykafka
+```
+
+#### 2. Pykafka 基本使用示例
+
+```python
+# oms_test/utils/kafka_conf.py
+from pykafka import KafkaClient
+
+
+######## pykafka test ########
+# 链接客户端
+client = KafkaClient(hosts='127.0.0.1:9093')
+
+# 查看已有的主题 Topic
+print(client.topics)
+# {b'my-replicated-topic': None}
+
+# 查看已创建的节点
+print(client.brokers)
+# {
+#     2: <pykafka.broker.Broker at 0x7f6169e0e650 (host=b'127.0.0.1', port=9094, id=2)>,
+#     1: <pykafka.broker.Broker at 0x7f616471b390 (host=b'127.0.0.1', port=9093, id=1)>
+# }
+for broker in client.brokers:
+    id = client.brokers[broker].id
+    host = client.brokers[broker].host
+    port = client.brokers[broker].port
+    print(f'{id} {host.decode()}:{port}')
+# 2 127.0.0.1:9094
+# 1 127.0.0.1:9093
+
+# 查看链接的节点
+print(client.cluster)
+# <pykafka.cluster.Cluster at 0x7f6169dfbc10 (hosts=127.0.0.1:9093)>
+
+# 获取某个主题 Topic
+topic = client.topics['my-replicated-topic']
+print(topic)
+# <pykafka.topic.Topic at 0x7f5ff9696e90 (name=b'my-replicated-topic')>
+# 如果输入的主题不存在, 默认自动新建这个主题
+new_topic = client.topics['store_topic']
+print(new_topic)
+# <pykafka.topic.Topic at 0x7f47493b4cd0 (name=b'store_topic')>
+
+# 创建一个同步模式的生产者并推送消息, 只有在确认消息已发送到集群之后, 才会返回调用
+with topic.get_sync_producer() as producer:
+    for i in range(1, 4):
+        producer.produce((f'测试消息 {i ** 2}').encode())
+
+# 创建一个消费者并接收消息
+# 注意, 本文件运行多少次就会生产多少次上面的消息并在这里接收到
+# 另外, 如果之前我们使用 kafka 测试时随便输入的内容在这里也会接收到
+consumer = topic.get_simple_consumer()
+print(consumer)
+# <pykafka.simpleconsumer.SimpleConsumer at 0x7f768e032510 (consumer_group=None)>
+for msg in consumer:
+    if msg is not None:
+        print(msg.offset, msg.value.decode())
+# 0 测试消息 1
+# 1 测试消息 4
+# 2 测试消息 9
+```
+
+> 注意：get_simple_consumer() 如果加了参数，则表示定义了一个具体的消费者
+>
+> 如果该消费者消费了一次 Topic 里的内容，则它不会再消费该 Topic 里面同样的内容
+>
+> 验证示例如下：
+
+```python
+# oms_test/utils/kafka_conf.py
+from pykafka import KafkaClient
+
+
+client = KafkaClient(hosts='127.0.0.1:9094')
+topic = client.topics['test_topic']
+
+consumer = topic.get_simple_consumer(consumer_group=b'first_consume', auto_commit_interval_ms=1, auto_commit_enable=True,consumer_id=b'first')
+for msg in consumer:
+    if msg is not None:
+        print(msg.offset, msg.value.decode())
+```
+
+>执行该 py 文件两次，会发现第一次打印消息，第二次以后不再打印，说明没有消费同样的内容
+>
+>当然，如果生产者推送了新的消息，这个消费者就能再次接收到新的内容，同样只能接收一次
+
+```python
+# oms_test/utils/kafka_conf.py
+from pykafka import KafkaClient
+
+
+client = KafkaClient(hosts='127.0.0.1:9094')
+topic = client.topics['test_topic']
+
+with topic.get_sync_producer() as producer:
+    for i in range(4, 8):
+        producer.produce((f'测试消息 {i ** 2}').encode())
+
+consumer = topic.get_simple_consumer(consumer_group=b'first_consume', auto_commit_interval_ms=1, auto_commit_enable=True,consumer_id=b'first')
+for msg in consumer:
+    if msg is not None:
+        print(msg.offset, msg.value.decode())
+# 第一次执行结果：
+3 测试消息 16
+4 测试消息 25
+5 测试消息 36
+6 测试消息 49
+# 第二次执行结果：
+7 测试消息 16
+8 测试消息 25
+9 测试消息 36
+10 测试消息 49
+......
+```
+
+>执行一次上面的内容，发现有打印消息
+>
+>执行多次，发现 msg.offset 的值越来越大，而每次只会获取生产者最新生成的消息
+>
+>如果再注释掉生产者代码，执行后发现不会再打印任何消息
+>
+>这就是 get_simple_consumer() 传参的一个特点之一，可以避免同一个消费者重复消费
+>
+>如果想重复消费，则不要传任何参数即可
+
+```python
+# oms_test/utils/kafka_conf.py
+from pykafka import KafkaClient
+
+
+client = KafkaClient(hosts='127.0.0.1:9094')
+topic = client.topics['test_topic']
+
+consumer = topic.get_simple_consumer()
+for msg in consumer:
+    if msg is not None:
+        print(msg.offset, msg.value.decode())
+# 不传参多次执行，结果一样(生产者不再推送消息的前提下)
+0 测试消息 1
+1 测试消息 4
+2 测试消息 9
+3 测试消息 16
+4 测试消息 25
+5 测试消息 36
+6 测试消息 49
+7 测试消息 16
+8 测试消息 25
+9 测试消息 36
+10 测试消息 49
+11 测试消息 16
+12 测试消息 25
+13 测试消息 36
+14 测试消息 49
+......
+```
+
+>当然，也可以定义另一个消费者，这样就会把之前生产者推送的所有消息都会获取到
+
+```python
+# oms_test/utils/kafka_conf.py
+from pykafka import KafkaClient
+
+
+client = KafkaClient(hosts='127.0.0.1:9094')
+topic = client.topics['test_topic']
+
+consumer = topic.get_simple_consumer(consumer_group=b'second_consume', auto_commit_interval_ms=1, auto_commit_enable=True,consumer_id=b'second')
+for msg in consumer:
+    if msg is not None:
+        print(msg.offset, msg.value.decode())
+# 0 测试消息 1
+# 1 测试消息 4
+# 2 测试消息 9
+# 3 测试消息 16
+# 4 测试消息 25
+# 5 测试消息 36
+......
+```
 
 
 

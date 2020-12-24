@@ -91,6 +91,6 @@ REST_FRAMEWORK = {
     # 全局设置, 默认所有接口都需要被验证
     'DEFAULT_PERMISSION_CLASSES': (
         'utils.permissions.APIPermission',
-        'utils.permissions.IsIdempotent',
+        # 'utils.permissions.IsIdempotent',
     ),
 }
