@@ -282,6 +282,152 @@ AnonymousUser
 [21/Dec/2020 03:54:30] "GET /store/store_account/?key=2 HTTP/1.1" 200 49
 ```
 
+### 日志模块 loguru 基本用法
+
+#### 1. 安装 loguru
+
+```bash
+pip install loguru
+```
+
+#### 2. 基本用法示例
+
+```python
+# oms_test/log_test.py
+import sys
+from loguru import logger
+
+# debug 测试
+logger.debug('this is a test...')
+# 2020-12-24 16:53:39.660 | DEBUG    | __main__:<module>:4 - this is a test...
+
+# 注册接收器
+logger.add(sys.stderr, format='{time} {level} {message}', filter='my_module', level='INFO')
+
+# 将日志信息输出到文件中（如果没有该文件则自动创建）
+logger.add('test_file.log')
+
+# 以当前运行时间节点为依据新建日志文件（每次运行都会新建一个日志文件）
+logger.add('test_{time}.log')
+
+# 将日志信息输出到文件中, 并限制每个文件的存储容量
+# 这里使用 1KB 来测试（注意：使用大写形式）, 运行后发现自动生成了两个文件
+logger.add('test01.log', rotation='1 KB')
+for i in range(20):
+    logger.info('this is a test...')
+
+# 以某个时间点为依据, 如果时间到了 17:39, 则 test02.log 自动改名（加个当前运行时间后缀）
+# 然后又有一个 test02.log 记录 17:39 之后的日志信息, 依次类推
+logger.add('test02.log', rotation='17:39')
+for i in range(20):
+    logger.info('this is a test...')
+
+# 同理, 也可以设置某个时间段来切分该日志文件
+logger.add('test02.log', rotation='1 week')
+
+# 每隔固定时间清除日志文件内容
+logger.add('test03.log', retention='2 days')
+
+# 将生成的日志文件自动压缩成 .zip 文件
+logger.add("test04.log", compression="zip")
+
+# 使用 logger.catch 捕捉程序运行时的任何异常
+@logger.catch
+def my_function(x, y, z):
+    return 1 / (x + y + z)
+my_function(0, 0, 0)
+# 运行结果：
+# 2020-12-24 18:42:20.359 | ERROR    | __main__:<module>:44 - An error has been caught in function '<module>', process 'MainProcess' (8644), thread 'MainThread' (140475222820608):
+# Traceback (most recent call last):
+#
+# > File "/home/yanfa/personal_project/oms_test/log_test.py", line 44, in <module>
+#     my_function(0, 0, 0)
+#     └ <function my_function at 0x7fc2efa81dd0>
+#
+#   File "/home/yanfa/personal_project/oms_test/log_test.py", line 42, in my_function
+#     return 1 / (x + y + z)
+#                 │   │   └ 0
+#                 │   └ 0
+#                 └ 0
+#
+# ZeroDivisionError: division by zero
+
+# 默认情况下, 添加到记录器的所有接收器都是线程安全的
+# 它们不是多进程安全的, 但是可以将消息排队以确保日志的完整性
+# 如果需要异步日志记录, 也可以使用相同的参数
+logger.add('test05.log', enqueue=True)
+```
+
+Loguru 通过允许显示整个堆栈跟踪信息（包括变量值）来找到问题
+
+```python
+# oms_test/log_test.py
+from loguru import logger
+
+logger.add('test.log', backtrace=True, diagnose=True)
+
+def func(a, b):
+    try:
+        a / b
+    except Exception:
+        logger.exception('运行错误')
+
+func(5, 0)
+# 运行结果：
+2020-12-25 10:14:00.176 | ERROR    | __main__:func:11 - 运行错误
+Traceback (most recent call last):
+
+  File "/home/yanfa/personal_project/oms_test/log_test.py", line 13, in <module>
+    func(5, 0)
+    └ <function func at 0x7f40ba78ddd0>
+
+> File "/home/yanfa/personal_project/oms_test/log_test.py", line 9, in func
+    a / b
+    │   └ 0
+    └ 5
+
+ZeroDivisionError: division by zero
+```
+
+format 属性的设置
+
+```python
+# oms_test/log_test.py
+from loguru import logger
+
+logger.add("test.log", format="{extra[ip]} {extra[user]} {message}")
+context_logger = logger.bind(ip="127.0.0.1", user="Alex")
+context_logger.info("上面 bind() 里设置的用户将对应这条信息")
+context_logger.bind(user="John").info("可以将参数设置成其他值, 比如这里替换之前的用户名")
+context_logger.info("日志文件打印的内容会按照上面的 format 属性来显示, 即 ip user message(指 info() 的内容)")
+
+# 终端输出内容：
+2020-12-25 10:39:32.984 | INFO     | __main__:<module>:6 - 上面 bind() 里设置的用户将对应这条信息
+2020-12-25 10:39:32.984 | INFO     | __main__:<module>:7 - 可以将参数设置成其他值, 比如这里替换之前的用户名
+2020-12-25 10:39:32.984 | INFO     | __main__:<module>:8 - 日志文件打印的内容会按照上面的 format 属性来显示, 即 ip user message(指 info() 的内容)
+# 文件输出内容：
+127.0.0.1 Alex 上面 bind() 里设置的用户将对应这条信息
+127.0.0.1 John 可以将参数设置成其他值, 比如这里替换之前的用户名
+127.0.0.1 Alex 日志文件打印的内容会按照上面的 format 属性来显示, 即 ip user message(指 info() 的内容)
+```
+
+结合 bind() 和 filter 属性对日志进行更细粒度的控制
+
+```python
+# oms_test/log_test.py
+from loguru import logger
+
+logger.add('test.log', filter=lambda record: 'special' in record['extra'])
+logger.debug('这条 DEBUG 信息不会被记录到日志文件中')
+logger.bind(special=True).info('使用 bind() 绑定上面 filter 设置的 special 后会记录消息到日志文件中')
+
+# 终端输出：
+2020-12-25 11:08:27.905 | DEBUG    | __main__:<module>:6 - 这条 DEBUG 信息不会被记录到日志文件中
+2020-12-25 11:08:27.905 | INFO     | __main__:<module>:7 - 使用 bind() 绑定上面 filter 设置的 special 后会记录消息到日志文件中
+# 日志文件输出：
+2020-12-25 11:08:27.905 | INFO     | __main__:<module>:7 - 使用 bind() 绑定上面 filter 设置的 special 值后会记录消息到日志文件中
+```
+
 ### kafka 的基本使用和单机伪集群搭建
 
 Ubuntu 和 CentOS7 的步骤一样，只不过这里把下载的文件上传到了 CentOS7 中
@@ -470,6 +616,19 @@ bin/kafka-console-consumer.sh --topic my-replicated-topic --from-beginning --boo
 bin/kafka-topics.sh --delete --topic test_topic --zookeeper localhost:2181
 ```
 
+##### 8) 编写一个脚本，方便开机时启动 kafka 服务
+
+```bash
+cd
+vim kafka.sh
+# 输入以下内容，保存退出
+#!/bin/sh
+cd /opt/kafka_2.13-2.7.0/
+sudo bin/zookeeper-server-start.sh config/zookeeper.properties &
+sudo bin/kafka-server-start.sh config/server-1.properties &
+sudo bin/kafka-server-start.sh config/server-2.properties &
+```
+
 ### Pykafka 的使用
 
 #### 1. 安装 pykafka
@@ -655,6 +814,3 @@ for msg in consumer:
 # 5 测试消息 36
 ......
 ```
-
-
-
