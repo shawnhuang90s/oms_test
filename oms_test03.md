@@ -698,11 +698,9 @@ for msg in consumer:
 # 2 测试消息 9
 ```
 
-> 注意：get_simple_consumer() 如果加了参数，则表示定义了一个具体的消费者
->
-> 如果该消费者消费了一次 Topic 里的内容，则它不会再消费该 Topic 里面同样的内容
->
-> 验证示例如下：
+注意：get_simple_consumer() 如果加了参数，则表示定义了一个具体的消费者
+
+如果该消费者消费了一次 Topic 里的内容，则它不会再消费该 Topic 里面同样的内容
 
 ```python
 # oms_test/utils/kafka_conf.py
@@ -718,9 +716,9 @@ for msg in consumer:
         print(msg.offset, msg.value.decode())
 ```
 
->执行该 py 文件两次，会发现第一次打印消息，第二次以后不再打印，说明没有消费同样的内容
->
->当然，如果生产者推送了新的消息，这个消费者就能再次接收到新的内容，同样只能接收一次
+执行该 py 文件两次，会发现第一次打印消息，第二次以后不再打印，说明没有消费同样的内容
+
+当然，如果生产者推送了新的消息，这个消费者就能再次接收到新的内容，同样只能接收一次
 
 ```python
 # oms_test/utils/kafka_conf.py
@@ -751,15 +749,15 @@ for msg in consumer:
 ......
 ```
 
->执行一次上面的内容，发现有打印消息
->
->执行多次，发现 msg.offset 的值越来越大，而每次只会获取生产者最新生成的消息
->
->如果再注释掉生产者代码，执行后发现不会再打印任何消息
->
->这就是 get_simple_consumer() 传参的一个特点之一，可以避免同一个消费者重复消费
->
->如果想重复消费，则不要传任何参数即可
+执行一次上面的内容，发现有打印消息
+
+执行多次，发现 msg.offset 的值越来越大，而每次只会获取生产者最新生成的消息
+
+如果再注释掉生产者代码，执行后发现不会再打印任何消息
+
+这就是 get_simple_consumer() 传参的一个特点之一，可以避免同一个消费者重复消费
+
+如果想重复消费，则不要传任何参数即可
 
 ```python
 # oms_test/utils/kafka_conf.py
@@ -792,7 +790,7 @@ for msg in consumer:
 ......
 ```
 
->当然，也可以定义另一个消费者，这样就会把之前生产者推送的所有消息都会获取到
+当然，也可以定义另一个消费者，这样就会把之前生产者推送的所有消息都会获取到
 
 ```python
 # oms_test/utils/kafka_conf.py
@@ -814,3 +812,111 @@ for msg in consumer:
 # 5 测试消息 36
 ......
 ```
+
+### 项目中日志使用示例
+
+#### 1. 配置内容
+
+```python
+# oms_test/oms_conf/oms_log.py
+########## 日志路径配置 ##########
+import os
+import loguru
+from pathlib import Path
+from datetime import datetime
+
+
+########## 基础路径配置 ##########
+logger = loguru.logger
+current_time = datetime.now().strftime('%Y-%m-%d')
+base_dir = Path(__file__).resolve().parent.parent
+# 以日期为界限, 每天的日志放一个文件夹内
+log_base_path = f'{base_dir}/log/{current_time}/'
+if not os.path.exists(log_base_path):
+    os.makedirs(log_base_path, exist_ok=False)
+
+########## kafka路径配置 ###########
+kafka_log = f'{log_base_path}/kafka/'
+```
+
+#### 2. 项目配置文件
+
+先在项目根目录下新建 log 文件夹
+
+```python
+# oms_test/oms_test/settings.py
+from oms_conf import oms_db, oms_redis, oms_kafka, oms_log
+......
+# Redis 配置
+REDIS_CONF = oms_redis.REDIS_CONF
+
+# Kafka 配置
+KAFKA_HOST = oms_kafka.KAFKA_HOST
+KAFKA_PORT = oms_kafka.KAFKA_PORT
+
+REST_FRAMEWORK = {
+    # 全局设置, 默认所有接口都需要被验证
+    'DEFAULT_PERMISSION_CLASSES': (
+        'utils.permissions.APIPermission',
+        # 'utils.permissions.IsIdempotent',
+    ),
+}
+
+########## 日志配置 ##########
+KAFKA_LOG = oms_log.kafka_log
+```
+
+#### 3. kafka 日志
+
+```python
+# oms_test/utils/kafka_conf/kafka_consumer.py
+import loguru
+from pykafka import KafkaClient
+from oms_test.settings import KAFKA_LOG, KAFKA_HOST, KAFKA_PORT
+
+logger = loguru.logger
+logger.add(f'{KAFKA_LOG}kafka_test.log', format='{time} {level} {message}', level='INFO')
+
+class SimpleConsumer:
+
+    def __init__(self):
+        self.host = KAFKA_HOST
+        self.port = KAFKA_PORT
+
+    def run(self):
+        logger.info('=============== kafka consumer start ===============')
+        client = KafkaClient(hosts=f'{self.host}:{self.port}')
+
+
+
+if __name__ == '__main__':
+    c_obj = SimpleConsumer()
+    c_obj.run()
+```
+
+运行该文件，发现 log 目录下有当前日期的目录，里面有 kafka 目录，最里面是 kafka_test.log
+
+#### 4. 忽略文件添加日志信息
+
+自己本地运行项目时产生的日志文件没必要上传到远程仓库
+
+```bash
+# oms_test/.gitignore
+.idea/
+*.pyc
+__pycache__/
+oms_conf/
+*/migrations/*
+api_doc/
+log/
+```
+
+清理本地 git 缓存
+
+```bash
+git rm -r -f --cached .
+git add .
+git commit -m '日志的基本使用及上传代码时忽略日志文件'
+git push origin master
+```
+

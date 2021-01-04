@@ -4,3 +4,4 @@ __pycache__/
 oms_conf/
 */migrations/*
 api_doc/
+log/

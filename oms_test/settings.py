@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from oms_conf import oms_db, oms_redis
+from oms_conf import oms_db, oms_redis, oms_kafka, oms_log
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,7 +22,6 @@ INSTALLED_APPS = [
     # 自建应用
     'store.apps.StoreConfig',
     'user.apps.UserConfig',
-    'system.apps.SystemConfig',
 ]
 
 MIDDLEWARE = [
@@ -85,7 +84,12 @@ USE_TZ = True
 STATIC_URL = '/static/'
 API_DOC_ROOT = os.path.join(BASE_DIR, 'api_doc/')
 
+# Redis 配置
 REDIS_CONF = oms_redis.REDIS_CONF
+
+# Kafka 配置
+KAFKA_HOST = oms_kafka.KAFKA_HOST
+KAFKA_PORT = oms_kafka.KAFKA_PORT
 
 REST_FRAMEWORK = {
     # 全局设置, 默认所有接口都需要被验证
@@ -94,3 +98,6 @@ REST_FRAMEWORK = {
         # 'utils.permissions.IsIdempotent',
     ),
 }
+
+########## 日志配置 ##########
+KAFKA_LOG = oms_log.kafka_log
