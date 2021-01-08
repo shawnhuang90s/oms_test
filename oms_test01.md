@@ -199,8 +199,8 @@ git push origin mater
 
 ### 添加配置文件夹
 
-项目中的配置文件一般包含跟数据库相关的很多敏感信息，因此最好不要把配置信息同步更新到远程仓库
-在项目根目录下新建一个文件夹 oms_conf，专门存放项目的配置文件信息
+1. 项目中的配置文件一般包含跟数据库相关的很多敏感信息，因此最好不要把配置信息同步更新到远程仓库
+2. 在项目根目录下新建一个文件夹 oms_conf，专门存放项目的配置文件信息
 
 ```bash
 # 打开 Pycharm 终端
@@ -237,6 +237,77 @@ DATABASE = {
 }
 ```
 
+### CentOS7 中安装 MySQL
+
+#### 1. 检测系统中是否有 MySQL
+
+> 参考资料：https://www.runoob.com/mysql/mysql-install.html
+
+```bash
+rpm -qa | grep mysql
+
+# 如果有旧版本的，想要卸载的话
+# 普通删除模式
+rpm -e mysql
+# 强力删除模式，如果使用上面命令删除时，提示有依赖的其它文件，则用该命令可以对其进行强力删除
+rpm -e --nodeps mysql
+```
+
+#### 2.安装资源包
+
+```bash
+# 安装 yum 资源包
+wget http://repo.mysql.com/mysql-community-release-el7-5.noarch.rpm
+rpm -ivh mysql-community-release-el7-5.noarch.rpm
+yum update
+# 安装 MySQL 服务
+yum install mysql-server
+```
+
+#### 3. 启动 MySQL
+
+```bash
+# 设置 MySQL 权限
+chown mysql:mysql -R /var/lib/mysql
+# 初始化 MySQL
+mysqld --initialize
+# 启动 MySQL
+systemctl start mysqld
+# 查看运行状态
+systemctl status mysqld
+# 验证
+mysqladmin --version
+# mysqladmin  Ver 8.42 Distrib 5.6.50, for Linux on x86_64
+```
+
+#### 4. MySQL 客户端
+
+```bash
+# 使用 mysql 命令连接到 MySQL 服务器上，默认情况下 MySQL 服务器的登录密码为空
+mysql
+show databases;
+exit
+
+# 新建用户及密码（示例）
+mysqladmin -u root password '123456';
+# 以新用户登录 MySQL
+mysql -uroot -p
+show databases;
+exit
+```
+
+#### 5. MariaDB 的安装（备选）
+
+> MariaDB 完全兼容 MySQL，包括 API 和命令行，可以说是 MySQL 的代替品
+
+```bash
+yum install mariadb-server mariadb
+systemctl start mariadb  	# 启动 MariaDB
+systemctl stop mariadb  	# 停止 MariaDB
+systemctl restart mariadb  	# 重启 MariaDB
+systemctl enable mariadb  	# 设置开机启动
+```
+
 ### MySQL 数据库的配置
 
 #### 1. 本地登录 MySQL 
@@ -248,7 +319,7 @@ mysql -uroot -p
 #### 2. MySQL 修改密码的方法示例
 
 ```mysql
-# 假设本地的 MySQL 登录密码与上面配置文件的不一样，要修改过来
+# 假设本地的 MySQL 登录密码与上面配置文件的不一样，登录，再修改
 set password for root@localhost=password('123456');
 # 修改成功后退出重新登录
 mysql -uroot -p
@@ -292,13 +363,13 @@ DATABASES = oms_db.DATABASES
 # }
 ```
 
-#### 6. 安装 Pymysql
+#### 6. 安装 pymysql
 
 ```bash
 pip install -i https://pypi.doubanio.com/simple/ pymysql
 ```
 
-#### 7. 导入 Pymysql 包
+#### 7. 导入 pymysql 包
 
 ```python
 # oms_test/oms_test/__init__.py
