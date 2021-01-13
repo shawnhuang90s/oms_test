@@ -26,3 +26,12 @@ CREATE TABLE `oms_user` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT '用户表';
+
+
+CREATE TABLE `student` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '学生ID',
+  `username` varchar(50) NOT NULL COMMENT '学生名',
+  `password` varchar(50) NOT NULL COMMENT '密码',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT '学生表';

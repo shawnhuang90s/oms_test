@@ -245,12 +245,17 @@ DATABASE = {
 
 ```bash
 rpm -qa | grep mysql
+# 假设运行后有以下结果：
+mysql-community-client-5.7.32-1.el7.x86_64
+mysql-community-server-5.7.32-1.el7.x86_64
+mysql-community-common-5.7.32-1.el7.x86_64
+mysql-community-libs-5.7.32-1.el7.x86_64
 
-# 如果有旧版本的，想要卸载的话
-# 普通删除模式
-rpm -e mysql
-# 强力删除模式，如果使用上面命令删除时，提示有依赖的其它文件，则用该命令可以对其进行强力删除
-rpm -e --nodeps mysql
+# 删除上面相关内容
+rpm -ev --nodeps mysql-community-client-5.7.32-1.el7.x86_64
+rpm -ev --nodeps mysql-community-server-5.7.32-1.el7.x86_64
+rpm -ev --nodeps mysql-community-common-5.7.32-1.el7.x86_64
+rpm -ev --nodeps mysql-community-libs-5.7.32-1.el7.x86_64
 ```
 
 #### 2.安装资源包
@@ -299,6 +304,8 @@ exit
 #### 5. MariaDB 的安装（备选）
 
 > MariaDB 完全兼容 MySQL，包括 API 和命令行，可以说是 MySQL 的代替品
+>
+> 如果担心 MySQL 后续会闭源，可以下载 MariaDB 使用
 
 ```bash
 yum install mariadb-server mariadb
