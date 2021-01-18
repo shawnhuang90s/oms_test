@@ -34,3 +34,6 @@ class Store(models.Model):
         app_label = 'store'
         db_table = 'oms_store'
         verbose_name = verbose_name_plural = '店铺表'
+
+    def __str__(self):
+        return self.name

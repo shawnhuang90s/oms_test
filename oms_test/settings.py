@@ -55,6 +55,8 @@ TEMPLATES = [
 WSGI_APPLICATION = 'oms_test.wsgi.application'
 
 DATABASES = oms_db.DATABASES
+# 配置读写分离
+DATABASE_ROUTERS = ['oms_conf.oms_db.MasterSlaveDBRouter']
 
 AUTH_PASSWORD_VALIDATORS = [
     {

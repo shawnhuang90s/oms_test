@@ -80,5 +80,6 @@ def batch_create03():
 if __name__ == '__main__':
     # batch_create01()
     # batch_create02()
-    batch_create03()
-
+    # batch_create03()
+    r = Store.objects.first()
+    print(r)

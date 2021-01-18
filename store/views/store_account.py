@@ -8,6 +8,7 @@ store_account_key = REDIS_CONF.store_account_key
 def save_store_account():
     """保存各平台店铺账户信息到 Redis 集群中"""
 
+    pl = redis_conn.pipeline()
     for i in range(1, 200):
         account_dict = dict()
         store_key = f'test_store_{i}'
@@ -177,7 +178,8 @@ def save_store_account():
                 name=f'name_{i}',
                 password=f'password_{i}',
             )
-        redis_conn.hset(store_account_key, store_key, json.dumps(account_dict))
+        pl.hset(store_account_key, store_key, json.dumps(account_dict))
+    pl.execute()
 
     return
 

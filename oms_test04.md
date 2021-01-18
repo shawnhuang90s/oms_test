@@ -57,7 +57,7 @@ mysqld=/usr/local/mysql/bin/mysqld
 mysqladmin=/usr/local/mysql/bin/mysqladmin
 log=/tmp/mysql_multi.log
 user=root
-password=123456
+pass=123456
 
 [mysqld]
 explicit_defaults_for_timestamp = true
@@ -69,7 +69,7 @@ datadir=/data/mysql_data1
 # 设置 sock 存放文件名, 多实例中一定要不同
 socket=/tmp/mysql.sock1
 # 设置监听开放端口, 多实例中一定要不同
-port=3306
+port=3307
 # 设置运行用户
 user=mysql
 # 关闭监控
@@ -100,7 +100,7 @@ binlog-ignore-db=performance_schema
 [mysqld2]
 datadir=/data/mysql_data2
 socket=/tmp/mysql.sock2
-port=3307
+port=3308
 user=mysql
 performance_schema=off
 innodb_buffer_pool_size=32M
@@ -152,7 +152,17 @@ server-id=102
 2021-01-13T05:55:23.255126Z 1 [Warning] 'tables_priv' entry 'sys_config mysql.sys@localhost' ignored in --skip-name-resolve mode.
 ```
 
+如果初始化实例时没有显示下面的内容，则查看相关日志文件获取密码信息
+
+```bash
+cat /var/log/mysql/error.log | grep "A temporary password is generated"
+# 运行结果示例：
+2021-01-14T02:55:08.386130Z 1 [Note] A temporary password is generated for root@localhost: T)3&#gIdsgwJ
+2021-01-14T02:55:28.967170Z 1 [Note] A temporary password is generated for root@localhost: EUiU#Bs-s0zl
+```
+
 #### 9. 复制多实例脚本到服务管理目录下
+
 ```bash
 cp /usr/local/mysql/support-files/mysqld_multi.server /etc/init.d/mysqld_multi
 ```
@@ -172,12 +182,6 @@ chkconfig --add mysqld_multi
 #### 12. mysqld_multi 多实例管理
 
 ```bash
-vim /etc/profile
-# 添加环境变量，保存退出
-export PATH=/usr/local/mysql/bin:$PATH
-# 激活
-source /etc/profile
-
 # 查看多实例
 /etc/init.d/mysqld_multi report
 # 运行结果：
@@ -195,6 +199,13 @@ MySQL server from group: mysqld2 is not running
 Reporting MySQL servers
 MySQL server from group: mysqld1 is running
 MySQL server from group: mysqld2 is running
+
+# 如果上面运行报错
+vim /etc/profile
+# 添加环境变量，保存退出
+export PATH=/usr/local/mysql/bin:$PATH
+# 激活
+source /etc/profile
 ```
 
 #### 13. 登录主库实例
@@ -211,7 +222,7 @@ flush privileges;
 exit;
 ```
 
-#### 14. 关闭主实例的服务
+#### 14. 关闭主实例的服务 (示例)
 
 ```bash
 # 重新使用新密码登录，关闭 MySQL 某个实例的服务并刷新
@@ -259,13 +270,14 @@ mysql -uroot -p -S  /tmp/mysql.sock2
 # 查询从库状态，发现没有信息
 show slave status\G
 # 设置从库信息
-mysql> change master to 
--> master_host='localhost',
--> master_user='slave',
--> master_password='123456',
+change master to 
+master_host='localhost',
+master_user='slave',
+master_password='123456',
 # 这里的 master_log_file 和 master_log_pos 对应上面主库状态的值
--> master_log_file='master.000001',
--> master_log_pos=1163;
+master_log_file='master.000001',
+master_log_pos=1163;
+
 # 启动从库服务
 start slave;
 # 再次查询从库状态
@@ -386,6 +398,8 @@ select * from student;
 
 #### 20. 设置主从库读写分离（数据库里直接设置权限）
 
+>参考资料：https://blog.csdn.net/eagle89/article/details/107153687
+
 - 一般来说，设置主从库还要区分各自的使用权限
 - 主库拥有所有的权限，而从库一般只用来读取数据即可
 - 因为在实际项目中，配置从库的目的是作为一个备份数据
@@ -416,6 +430,8 @@ INSERT INTO student (username, password) VALUES ('aaa', '12345');
 # 运行结果：
 Query OK, 1 row affected (0.00 sec)
 ```
+
+##### 2) 限制 super 用户权限
 
 发现还是能执行插入数据的操作，是因为刚才的设置没生效吗？
 
@@ -534,3 +550,590 @@ revoke super on *.* from root@'localhost';
 show grants for root@'localhost';
 ```
 
+### MySQL 主从复制（以 Ubuntu 为例）
+
+> 参考资料：https://blog.csdn.net/qq_39123009/article/details/103732208
+
+#### 1. 使用 apt 包管理工具安装
+
+```bash
+sudo apt update
+sudo apt install mysql-server -y
+```
+
+#### 2. 停止 MySQL 服务并禁止其自动启动
+
+```bash
+sudo systemctl stop mysql
+sudo systemctl disable mysql
+```
+
+#### 3. 创建 MySQL 数据存放目录
+
+```bash
+sudo mkdir -p /data/mysql/{3306,3307,3308}
+```
+
+#### 4. 创建 pid 存放目录
+
+```bash
+sudo mkdir -p /data/mysql/pid
+```
+
+#### 5. 创建日志文件
+
+```bash
+# 创建错误日志记录文件
+sudo touch /data/mysql/error.log
+```
+
+#### 6. 修改目录权限
+
+```bash
+sudo chown -R mysql:mysql /data
+```
+
+#### 7. 复制 MySQL 配置文件
+
+```bash
+sudo cp /etc/mysql/my.cnf /etc/mysql/3306.cnf
+sudo cp /etc/mysql/my.cnf /etc/mysql/3307.cnf
+sudo cp /etc/mysql/my.cnf /etc/mysql/3308.cnf
+```
+
+#### 8. 编辑三个实例对应的配置文件
+
+3306.cnf
+
+```bash
+sudo vim /etc/mysql/3306.cnf
+# 添加以下内容：
+[mysqld]
+port=3306
+datadir=/data/mysql/3306/
+socket=/tmp/mysql3306.sock
+symbolic-links=0
+
+[mysqld_safe]
+log-error=/data/mysql/3306.log
+pid-file=/data/mysql/pid/3306.pid
+
+[client]
+port=3306
+socket=/tmp/mysql3306.sock
+```
+
+3307.cnf
+
+```bash
+sudo vim /etc/mysql/3307.cnf
+# 添加以下内容：
+[mysqld]
+port=3307
+datadir=/data/mysql/3307/
+socket=/tmp/mysql3307.sock
+symbolic-links=0
+
+[mysqld_safe]
+log-error=/data/mysql/3307.log
+pid-file=/data/mysql/pid/3307.pid
+
+[client]
+port=3307
+socket=/tmp/mysql3307.sock
+```
+
+3308.cnf
+
+```bash
+sudo vim /etc/mysql/3307.cnf
+# 添加以下内容：
+[mysqld]
+port=3308
+datadir=/data/mysql/3308/
+socket=/tmp/mysql3308.sock
+symbolic-links=0
+
+[mysqld_safe]
+log-error=/data/mysql/3308.log
+pid-file=/data/mysql/pid/3308.pid
+
+[client]
+port=3308
+socket=/tmp/mysql3308.sock
+```
+
+#### 9. 修改 MySQL 配置文件
+
+```bash
+sudo vim /etc/mysql/my.cnf
+# 添加以下内容：
+[mysqld_multi]
+mysqld=/usr/bin/mysqld_safe
+mysqladmin=/usr/bin/mysqladmin
+user=root
+# 需要注意，是 pass 而不是 password，用于后面使用 stop 时使用，可修改为你自定义的密码
+pass=123456
+
+[mysqld3306]
+port=3306
+server-id=3306
+datadir=/data/mysql/3306/
+log-bin=/data/mysql/3306/mysql-bin
+pid-file=/data/mysql/pid/3306.pid
+socket=/tmp/mysql3306.sock
+log-error=/data/mysql/error.log
+skip-external-locking
+
+[mysqld3307]
+port=3307
+server-id=3307
+datadir=/data/mysql/3307/
+log-bin=/data/mysql/3307/mysql-bin
+pid-file=/data/mysql/pid/3307.pid
+socket=/tmp/mysql3307.sock
+log-error=/data/mysql/error.log
+skip-external-locking
+
+[mysqld3308]
+port=3308
+server-id=3308
+datadir=/data/mysql/3308/
+log-bin=/data/mysql/3308/mysql-bin
+pid-file=/data/mysql/pid/3308.pid
+socket=/tmp/mysql3308.sock
+log-error=/data/mysql/error.log
+skip-external-locking
+
+[mysql]
+no-auto-rehash
+# 为了配置 Django 项目中链接数据库进行访问，这里选择 3306 这个主库作为 MySQL 默认链接的库
+# 也就是说在终端输入 mysql -uroot -p 登录时，默认登录的是主库
+# 如果不加这个 socket 配置，后面主从复制配置成功后如果尝试 mysql -uroot -p 登录时
+# 会直接报错：Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock'
+socket=/tmp/mysql3306.sock
+```
+
+#### 10. 授权 mysqld 目录访问权限
+
+```bash
+sudo vim /etc/apparmor.d/usr.sbin.mysqld
+# 大括号里添加以下内容：
+/data/mysql/ r,
+/data/mysql/** rwk,
+
+# 重启 apparmor 服务
+sudo service apparmor restart
+```
+
+#### 11. 初始化 3306/3307/3308 这三个实例
+
+```bash
+sudo mysqld --defaults-file=/etc/mysql/3306.cnf --initialize-insecure --user=mysql --explicit_defaults_for_timestamp
+sudo mysqld --defaults-file=/etc/mysql/3307.cnf --initialize-insecure --user=mysql --explicit_defaults_for_timestamp
+sudo mysqld --defaults-file=/etc/mysql/3308.cnf --initialize-insecure --user=mysql --explicit_defaults_for_timestamp
+```
+
+#### 12. 修改目录权限
+
+```bash
+sudo chown -R <本机用户名>:root /data
+```
+
+#### 13. 启动运行三个实例并查看
+
+```bash
+# 启动
+mysqld_multi start 3306-3308
+# 查看实例运行状态
+mysqld_multi report
+# 查看端口信息
+netstat -lnpt | grep -E "3306|3307|3308"
+```
+
+#### 14. 设置三个实例的登录密码
+
+```bash
+# 因为在前面初始化数据库时使用的是 –initialize-insecure 参数
+# 所以默认的数据库时没有密码的，我们通过 mysqladmin 命令初始化
+mysqladmin -u root password 123456 -S /tmp/mysql3306.sock
+mysqladmin -u root password 123456 -S /tmp/mysql3307.sock
+mysqladmin -u root password 123456 -S /tmp/mysql3308.sock
+
+# 或者
+mysqladmin -u root password 123456 -P3306 -h127.0.0.1
+mysqladmin -u root password 123456 -P3307 -h127.0.0.1
+mysqladmin -u root password 123456 -P3308 -h127.0.0.1
+```
+
+如果后续要修改密码，示例命令如下
+
+```bash
+mysqladmin -u root -p password <新密码> -P3306 -h127.0.0.1
+# 回车后输入数据库旧密码确认即可
+```
+
+#### 15. 登录实例
+
+```bash
+mysql -u root -p -S /tmp/mysql3306.sock
+```
+
+#### 16. 设置允许远程链接数据库
+
+```mysql
+# '%'表示允许任何 IP 访问
+update mysql.user set host='%' where user='root';
+# 刷新
+flush privileges;
+# 查看是否修改成功
+select user, host from mysql.user;
+exit;
+```
+
+#### 17. 解除数据库默认绑定的 IP 地址限制
+
+```bash
+sudo vim /etc/mysql/mysql.conf.d/mysqld.cnf
+# 将 bind-address = 127.0.0.1 这一行注释掉
+```
+
+#### 18. 重启各个实例
+
+```bash
+mysqld_multi stop 3306-3308
+mysqld_multi start 3306-3308
+
+# 查看端口信息
+netstat -lnpt | grep -E "3306|3307|3308"
+```
+
+#### 19. 设置 3306 端口作为主库
+
+```bash
+mysql -u root -p -S /tmp/mysql3306.sock
+GRANT REPLICATION SLAVE ON *.* TO 'slave1'@'localhost' IDENTIFIED BY 'slave1';
+GRANT REPLICATION SLAVE ON *.* TO 'slave2'@'localhost' IDENTIFIED BY 'slave2';
+flush privileges;
+# 查看主库状态, 记住 File 和 Position 的值
+show master status\G
+exit;
+# 注意：执行完此步骤后不要再操作主服务器 MySQL，防止主服务器状态发生状态值变化
+```
+
+#### 20. 设置 3307/3308 端口作为从库
+
+##### 1) 3307 从库设置
+
+```bash
+# 登录 3307 从库
+mysql -u root -p -S /tmp/mysql3307.sock
+# 注意：这里的 master_log_file 和 master_log_position 分别对应上面 File 和 Position 的值
+change master to master_host='localhost', master_user = 'slave1', master_password = 'slave1', master_log_file = 'mysql-bin.000002', master_log_pos = 876;
+# 开启 Slave 模式
+start slave;
+# 查看 Slave 状态
+show slave status\G
+exit;
+```
+
+##### 2) 3308 从库设置
+
+```bash
+# 登录 3308 从库
+mysql -u root -p -S /tmp/mysql3308.sock
+# 注意：这里的 master_log_file 和 master_log_position 分别对应上面 File 和 Position 的值
+change master to master_host='localhost', master_user = 'slave2', master_password = 'slave2', master_log_file = 'mysql-bin.000002', master_log_pos = 876;
+# 开启 Slave 模式
+start slave;
+# 查看 Slave 状态
+show slave status\G
+exit;
+```
+
+##### 3) 查询相关状态
+
+```bash
+# 如果查看两个从库的状态时，以下信息状态对应，说明 Slave 正常运行
+Slave_IO_State:Waiting for master ot send event
+Slave_IO_Running: YES
+Slave_SQL_Running: YES
+```
+
+#### 21. 测试主从复制是否成功
+
+```bash
+# 登录主库新建一个数据库
+mysql -u root -p -S /tmp/mysql3306.sock
+create database oms_test default charset=utf8;
+exit;
+# 登录从库查询是否也有该数据库
+mysql -u root -p -S /tmp/mysql3307.sock
+show databases;
+exit
+mysql -u root -p -S /tmp/mysql3308.sock
+show databases;
+exit
+```
+
+#### 22. 常用语句总结
+
+```bash
+show master status;  # 查看 master 的状态，尤其是当前的日志及位置
+show slave status;   # 查看 slave 的状态
+start slave;         # 启动 slave 模式
+stop slave;          # 停止 slave 模式
+```
+
+### 项目中配置 MySQL 主从复制与读写分离
+
+#### 1. 数据库主从复制与读写分离配置
+
+```bash
+# oms_test/oms_conf/oms_db.py
+#!/usr/bin/env python
+# encoding: utf-8
+
+# 数据库配置
+DATABASES = {
+    # 主库
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'USER': 'root',
+        'NAME': 'oms_test',
+        'PASSWORD': '123456',
+        'HOST': '127.0.0.1',
+        'PORT': 3306,
+    },
+    # 这里只配置 3307 端口作为从库查数据
+    'slave': {
+        'ENGINE': 'django.db.backends.mysql',
+        'USER': 'root',
+        'NAME': 'oms_test',
+        'PASSWORD': '123456',
+        'HOST': '127.0.0.1',
+        'PORT': 3307,
+    },
+}
+
+
+class MasterSlaveDBRouter(object):
+    """MySQL 数据库主从复制读写分离路由配置"""
+
+    def db_for_read(self, model, **hints):
+        """读数据库"""
+        return 'slave'
+
+    def db_for_write(self, model, **hints):
+        """写数据库"""
+        return 'default'
+
+    def allow_relation(self, obj1, obj2, **hints):
+        """是否运行关联操作"""
+        return True
+```
+
+#### 2. 项目配置文件添加 MySQL 配置内容
+
+```python
+# oms_test/oms_test/settings.py
+
+......
+DATABASES = oms_db.DATABASES
+# 配置读写分离
+DATABASE_ROUTERS = ['oms_conf.oms_db.MasterSlaveDBRouter']
+......
+```
+
+#### 3. PyCharm 中 Database 重新链接
+
+- 前面项目中使用 MySQL 时，没有进行主从复制和读写分离配置
+- 这里配置好后，点击 PyCharm 右边的 Database，右击选中之前链接的数据库，点击 remove
+- 点击 + 号重新链接主库 ---> Host：127.0.0.1 ---> Database：oms_test ---> User：root ---> Password：123456 ---> 点击 Test Connection，没问题后点击 Apply ---> 点击 OK
+- 链接后，发现里面只有我们刚才主从复制测试新建的那个 oms_test 数据库
+
+#### 4. 重新迁移项目数据库并添加测试数据
+
+先删除 store/user 目录下 的 makemigrations 文件夹，然后执行命令：
+
+```bash
+python manage.py makemigrations user
+python manage.py makemigrations store
+python manage.py migrate
+```
+
+运行后，Database 里右击点击我们刚才链接的数据库，即 oms_test@localhost，点击上方的刷新按钮，刷新数据库，再点击该数据库，查看详情，发现多了 Django 自带的一些表。当然，oms_store 和 oms_user 表是不会迁移的，因为一开始设置了 managed = False
+
+再次点击 oms_test@localhost，点击 `QL` 按钮，复制 oms_table.sql 文件中的建表语句，重新执行一遍
+
+```mysql
+CREATE TABLE `oms_store` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '店铺ID',
+  `name` varchar(200) DEFAULT NULL COMMENT '店铺名',
+  `manager_name` varchar(100) DEFAULT NULL COMMENT '店铺负责人',
+  `manager_id` int(11) DEFAULT NULL COMMENT '店铺负责人ID',
+  `center` varchar(100) DEFAULT NULL COMMENT '渠道中心',
+  `center_id` int(11) DEFAULT NULL COMMENT '渠道中心ID',
+  `platform` varchar(45) DEFAULT NULL COMMENT '平台名',
+  `market` varchar(200) DEFAULT NULL COMMENT '站点',
+  `market_id` int(11) DEFAULT NULL COMMENT '站点ID',
+  `status` tinyint(2) DEFAULT NULL COMMENT '店铺状态',
+  `last_download_time` DATETIME DEFAULT NULL COMMENT '上次抓单时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT '店铺表';
+
+
+CREATE TABLE `oms_user` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+  `username` varchar(50) NOT NULL COMMENT '用户名',
+  `password` varchar(50) NOT NULL COMMENT '密码',
+  `is_superuser` tinyint(1) DEFAULT FALSE COMMENT '是否是超级用户',
+  `email` varchar(50) DEFAULT NULL COMMENT '邮箱',
+  `is_active` tinyint(1) NOT NULL COMMENT '在职/离职状态',
+  `date_joined` datetime(6) NOT NULL COMMENT '新建用户加入时间记录',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT '用户表';
+```
+
+点击刷新按钮，再次查看，发现数据库中多了这两个表
+
+打开 oms_test/store/tests.py 文件，右击重新运行该文件，添加测试店铺数据，再查看该表，发现数据有了
+
+#### 5. 验证主从复制是否成功
+
+```bash
+# 打开 PyCharm 终端，进入主/从库查看是否有了上面新增的表和数据
+
+# 使用默认方式登录
+mysql -uroot -p
+# 切换到 oms_test 数据库
+mysql> use oms_test;
+Database changed
+mysql> show tables;
++----------------------------+
+| Tables_in_oms_test         |
++----------------------------+
+| auth_group                 |
+| auth_group_permissions     |
+| auth_permission            |
+| auth_user                  |
+| auth_user_groups           |
+| auth_user_user_permissions |
+| django_admin_log           |
+| django_content_type        |
+| django_migrations          |
+| django_session             |
+| oms_store                  |
+| oms_user                   |
++----------------------------+
+12 rows in set (0.00 sec)
+
+mysql> select * from oms_store order by id desc limit 5;
++-----+----------------+------------------+------------+-----------------+-----------+-------------------+--------------+-----------+--------+---------------------+
+| id  | name           | manager_name     | manager_id | center          | center_id | platform          | market       | market_id | status | last_download_time  |
++-----+----------------+------------------+------------+-----------------+-----------+-------------------+--------------+-----------+--------+---------------------+
+| 199 | test_store_199 | test_manager_199 |        199 | test_center_199 |       199 | test_platform_199 | test.199.com |       199 |      1 | 2021-01-18 07:45:06 |
+| 198 | test_store_198 | test_manager_198 |        198 | test_center_198 |       198 | test_platform_198 | test.198.com |       198 |      1 | 2021-01-18 07:45:06 |
+| 197 | test_store_197 | test_manager_197 |        197 | test_center_197 |       197 | test_platform_197 | test.197.com |       197 |      1 | 2021-01-18 07:45:06 |
+| 196 | test_store_196 | test_manager_196 |        196 | test_center_196 |       196 | test_platform_196 | test.196.com |       196 |      1 | 2021-01-18 07:45:06 |
+| 195 | test_store_195 | test_manager_195 |        195 | test_center_195 |       195 | test_platform_195 | test.195.com |       195 |      1 | 2021-01-18 07:45:06 |
++-----+----------------+------------------+------------+-----------------+-----------+-------------------+--------------+-----------+--------+---------------------+
+5 rows in set (0.00 sec)
+
+mysql> exit;
+Bye
+
+# 同理使用同样的 sql 语句查看主库/从库的数据
+mysql -uroot -p -S /tmp/mysql3306.sock
+......
+mysql -uroot -p -S /tmp/mysql3307.sock
+......
+mysql -uroot -p -S /tmp/mysql3308.sock
+......
+```
+
+#### 6. 虚拟环境安装 ipython 
+
+>`ipython`是一个`python`的交互式`shell`，比默认的`python shell`好用得多，支持变量自动补全，自动缩进，支持`bash shell`命令，内置了许多很有用的功能和函数
+>
+>最主要的是，在 Django 项目中，可以在这个 shell 里面调用当前项目的 models.py 中的 API，对于操作数据非常方便
+
+没安装前，查看 `python shell` 使用效果
+
+```bash
+# 打开 PyCharm 终端
+python manage.py shell
+
+# 执行结果，如果想复制某段代码块来查看执行效果，会非常麻烦，进行出现缩进问题
+Python 3.7.4 (default, Aug  4 2020, 15:26:49) 
+[GCC 5.4.0 20160609] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+(InteractiveConsole)
+>>> from store.models import Store
+>>> exit()
+```
+
+安装 `ipython` 和 `jedi`
+
+```bash
+# 如果默认安装最新版本，可能报错，因此这里指定某个版本
+pip install ipython==7.13.0 -i https://pypi.douban.com/simple/
+pip install jedi==0.17.0 -i https://pypi.douban.com/simple/
+```
+
+使用 `ipython` 
+
+```python
+python manage.py shell
+
+# 运行内容示例：
+from store.models import Store
+r = Store.objects.all()
+r
+# 运行结果：
+Out[3]: <QuerySet [<Store: Store object (1)>, <Store: Store object (2)>, <Store: Store object (3)>, <Store: Store object (4)>, <Store: Store object (5)>, <Store: Store object (6)>, <Store: Store object (7)>, <Store: Store object (8)>, <Store: Store object (9)>, <Store: Store object (10)>, <Store: Store object (11)>, <Store: Store object (12)>, <Store: Store object (13)>, <Store: Store object (14)>, <Store: Store object (15)>, <Store: Store object (16)>, <Store: Store object (17)>, <Store: Store object (18)>, <Store: Store object (19)>, <Store: Store object (20)>, '...(remaining elements truncated)...']>
+```
+
+#### 7. 模型类中使用 `__str__` 
+
+这里发现，每条数据的显示格式都是 <Store: Store object (1)>，看不出是什么内容，为了更直观查看每个店铺的店铺名，可以在模型类中设置
+
+```python
+# oms_test/store/models.py
+from django.db import models
+
+
+class Store(models.Model):
+    """店铺模型类"""
+    ......
+    # 添加以下内容
+    def __str__(self):
+        return self.name
+```
+
+终端退出 shell 并重新进入，查看效果
+
+```python
+python manage.py shell
+
+# 再次执行
+from store.models import Store
+r = Store.objects.all()
+r
+# 这里发现之前的 <Store: Store object (1)> 变成了 <Store: test_store_1>，一下子就能看出是什么店铺
+Out[3]: <QuerySet [<Store: test_store_1>, <Store: test_store_2>, <Store: test_store_3>, <Store: test_store_4>, <Store: test_store_5>, <Store: test_store_6>, <Store: test_store_7>, <Store: test_store_8>, <Store: test_store_9>, <Store: test_store_10>, <Store: test_store_11>, <Store: test_store_12>, <Store: test_store_13>, <Store: test_store_14>, <Store: test_store_15>, <Store: test_store_16>, <Store: test_store_17>, <Store: test_store_18>, <Store: test_store_19>, <Store: test_store_20>, '...(remaining elements truncated)...']>
+```
+
+之前我们在 oms_user 表其实使用了 `__str__`，只不过没有查看实际效果
+
+```python
+# oms_test/user/models.py
+......
+class User(models.Model):
+    ......
+    def __str__(self):
+        # 优先显示用户名, 其次是ID
+        return str(self.username) or str(self.id)
+```
