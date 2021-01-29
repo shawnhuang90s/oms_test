@@ -22,7 +22,7 @@ CREATE TABLE `oms_user` (
   `is_superuser` tinyint(1) DEFAULT FALSE COMMENT '是否是超级用户',
   `email` varchar(50) DEFAULT NULL COMMENT '邮箱',
   `is_active` tinyint(1) NOT NULL COMMENT '在职/离职状态',
-  `date_joined` datetime(6) NOT NULL COMMENT '新建用户加入时间记录',
+  `date_joined` datetime DEFAULT NULL COMMENT '新建用户加入时间记录',
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT '用户表';

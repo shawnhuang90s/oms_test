@@ -1137,3 +1137,53 @@ class User(models.Model):
         # 优先显示用户名, 其次是ID
         return str(self.username) or str(self.id)
 ```
+
+#### 8. 项目启动时报错 MySQL 无法链接解决办法
+
+```bash
+# 场景：重启电脑后，再尝试重启项目时发现报错：
+django.db.utils.OperationalError: (2003, "Can't connect to MySQL server on '127.0.0.1' ([Errno 111] Connection refused)")
+
+# 终端尝试链接 MySQL 
+mysql -uroot -p
+# 报错：
+ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/tmp/mysql3306.sock' (2)
+
+# 查看 MySQL 服务状态
+ps -ef | grep mysql
+# 结果如下，发现没有运行
+yanfa    19135  5505  0 14:46 pts/18   00:00:00 grep --color=auto mysql
+
+# 尝试重新启动 MySQL
+systemctl start mysql
+# 报错：
+Job for mysql.service failed because the control process exited with error code. See "systemctl status mysql.service" and "journalctl -xe" for details.
+
+# 根据提示查看 MySQL 状态
+systemctl status mysql.service
+# 红字提示：
+Failed to start MySQL Community Server.
+
+# 后来想起，可能是之前创建的三个实例关机后也自动关闭了，再次尝试启动三个实例
+mysqld_multi start 3306-3308
+# 查看结果：
+mysqld_multi report
+# 运行结果：
+Wide character in print at /usr/bin/mysqld_multi line 678.
+Reporting MySQL servers
+MySQL server from group: mysqld3306 is running
+MySQL server from group: mysqld3307 is running
+MySQL server from group: mysqld3308 is running
+
+# 再次尝试登录 MySQL，发现可以了
+mysql -uroot -p
+
+# 顺便像之前的 Redis 和 Kafka 一样，新建一个 sh 文件
+vim mysql.sh
+# 添加以下内容，保存退出
+#!/bin/sh
+mysqld_multi start 3306-3308
+mysqld_multi report
+netstat -lnpt | grep -E "3306|3307|3308"
+```
+

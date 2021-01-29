@@ -693,6 +693,7 @@ sudo tar -zxvf redis-6.0.9.tar.gz
 cd redis-6.0.9/
 sudo apt-get install gcc
 sudo make
+sudo make test
 sudo make install
 ```
 
@@ -702,9 +703,9 @@ sudo make install
 # 新建 redis 目录
 sudo mkdir /etc/redis
 # 复制解压后目录下的配置文件到 /etc/redis 下并重命名为 6379.conf
-sudo cp redis.conf /etc/redis/6379.conf
+sudo cp /opt/redis-6.0.9/redis.conf /etc/redis/6379.conf
 # 编辑该文件，将 daemonize no 修改为 daemonize yes，保存退出
-sudo vim /etc/redis/redis.conf
+sudo vim /etc/redis/6379.conf
 # 启动 Redis 服务
 sudo /usr/local/bin/redis-server /etc/redis/6379.conf
 # 进入 Redis 并测试（结果为 PONG)
@@ -748,6 +749,7 @@ pidfile /var/run/redis_7101.pid
 cluster-enabled yes
 cluster-config-file nodes-7101.conf
 cluster-node-timeout 15000
+# 备份数据
 appendonly yes
 ```
 
