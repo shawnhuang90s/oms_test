@@ -5,5 +5,5 @@ oms_conf/
 */migrations/*
 api_doc/
 log/
-.log
-.pid
+*.log
+*.pid
