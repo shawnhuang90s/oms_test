@@ -258,7 +258,7 @@ rpm -ev --nodeps mysql-community-common-5.7.32-1.el7.x86_64
 rpm -ev --nodeps mysql-community-libs-5.7.32-1.el7.x86_64
 ```
 
-#### 2.安装资源包
+#### 2. 安装资源包
 
 ```bash
 # 安装 yum 资源包

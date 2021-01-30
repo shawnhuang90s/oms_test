@@ -7,9 +7,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'xqd19(a7n=3#+c#1w-$^v*v*d-ity4s(x+6afhjnk7q1_)wd_y'
 
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -101,5 +101,7 @@ REST_FRAMEWORK = {
     ),
 }
 
-########## 日志配置 ##########
+# 日志配置
 KAFKA_LOG = oms_log.kafka_log
+STORE_LOG = oms_log.store_log
+

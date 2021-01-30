@@ -428,7 +428,7 @@ logger.bind(special=True).info('使用 bind() 绑定上面 filter 设置的 spec
 2020-12-25 11:08:27.905 | INFO     | __main__:<module>:7 - 使用 bind() 绑定上面 filter 设置的 special 值后会记录消息到日志文件中
 ```
 
-### kafka 的基本使用和单机伪集群搭建
+### Kafka 的基本使用和单机伪集群搭建
 
 Ubuntu 和 CentOS7 的步骤一样，只不过这里把下载的文件上传到了 CentOS7 中
 
