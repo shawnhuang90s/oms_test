@@ -138,7 +138,7 @@ api_doc/
 
 ```bash
 # 打开 Pycharm 终端
-git rm -r -f --cached .
+git rm -rf --cached .
 git add .
 git commit -m '项目中自动生成 API 文档/添加忽略文件并重新上传代码到远程仓库'
 git push origin master
