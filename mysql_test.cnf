@@ -1,0 +1,82 @@
+[mysqld]
+datadir = /data/mysql_data
+max_allowed_packet = 256M
+[mysqld]
+datadir = /data/mysql_data
+log-warning=2
+datadir = /data/mysql_data
+log-warning=2
+#关总设置参数（254服务器）
+#log_throttle_queries_not_using_indexes = 10
+#long_query_time = 6
+#innodb_thread_concurrency = cpu(数量)*2
+innodb_thread_concurrency = 8
+#innodb_buffer_pool_size = 全部内存数 * 75%
+innodb_buffer_pool_size = 6G
+read_buffer_size = 32M
+sort_buffer_size = 32M
+join_buffer_size = 64M
+#默认为8MB
+bulk_insert_buffer_size = 64M
+#tmp_table_size = 256M
+tmp_table_size = 512M
+#系统默认为16M，可以在线修改
+#max_heap_table_size = 256M
+max_heap_table_size = 512M
+#query_cache_type=1
+query_cache_type=0
+#query_cache_size=256M
+query_cache_size=0M
+innodb_open_files = 1000
+group_concat_max_len =2048
+#开启慢查询，从库一般关闭
+slow_query_log = ON
+long_query_time = 2
+slow_query_log_file =/data/mysql_data/beihuo_slow.log
+port = 3306
+socket = /tmp/mysql.sock
+skip-external-locking
+key_buffer_size = 256M
+max_allowed_packet = 256M
+#1024的倍数
+table_open_cache = 5120
+read_rnd_buffer_size = 8M
+myisam_sort_buffer_size = 64M
+thread_cache_size = 64
+thread_concurrency = 64
+read_only=0
+wait_timeout=18000
+interactive_timeout=18000
+max_connect_errors = 1000
+max_connections=1500
+skip-name-resolve
+log-bin=mysql-bin
+binlog_format=mixed
+expire_logs_days = 5
+relay-log=localhost-relay-bin
+#slave_skip_errors=1452,1062
+#innodb_log_file_size=128M
+server-id = 1
+basedir = /usr/local/mysql
+#老版本5.5.56写法
+#log-warning = 2
+#新版本10.3.14写法
+log_warnings = 2
+innodb_flush_log_at_trx_commit= 0
+#为了在最大程序上保证复制的InnoDB事务持久性和一致性
+sync_binlog=0
+#replicate_do_db=starpro
+#replicate_do_db=kaifa_1688_pro
+[mysql]
+default-character-set=utf8
+no-auto-rehash
+[mysqlhotcopy]
+interactive-timeout
+[mysqldump]
+quick
+[myisamchk]
+key_buffer_size = 128M
+sort_buffer_size = 256M
+read_buffer = 4M
+write_buffer = 4M
+skip-name-resolve

@@ -446,7 +446,7 @@ scp -r jdk-15.0.1_linux-x64_bin.tar.gz root@182.254.177.42:/opt
 
 登录到云服务器后，查看家目录，发现有该文件了
 
-#### 2. 安装 kafka
+#### 2. 安装 JDK
 
 ```bash
 # 把家目录下的压缩文件移至 /opt 目录下
@@ -639,178 +639,195 @@ pip install pykafka
 
 #### 2. Pykafka 基本使用示例
 
+##### 1) 查询基础属性值
+
 ```python
-# oms_test/utils/kafka_conf.py
+# oms_test/oms_conf/oms_kafka.py
+KAFKA_HOSTS = '127.0.0.1:9093, 127.0.0.1:9094'
+
+
+# oms_test/oms_test/settings.py
+......
+# Kafka 配置
+KAFKA_HOSTS = oms_kafka.KAFKA_HOSTS
+......
+
+# utils 目录下新建目录：kafka
+# oms_test/utils/kafka/pykafka_test.py
 from pykafka import KafkaClient
+from oms_test.settings import KAFKA_HOSTS
 
 
-######## pykafka test ########
-# 链接客户端
-client = KafkaClient(hosts='127.0.0.1:9093')
+class PyKafkaTest:
+    """Kafka 基本用法示例"""
+    def __init__(self):
+        self.hosts = KAFKA_HOSTS
+        self.client = KafkaClient(hosts=self.hosts)
 
-# 查看已有的主题 Topic
-print(client.topics)
-# {b'my-replicated-topic': None}
+    def query(self):
+        """查看链接的客户端的各个属性值"""
+        # 客户端属性
+        print(self.client)
+        # <pykafka.client.KafkaClient at 0x7fb3acce0890 (hosts=127.0.0.1:9093, 127.0.0.1:9094)>
 
-# 查看已创建的节点
-print(client.brokers)
-# {
-#     2: <pykafka.broker.Broker at 0x7f6169e0e650 (host=b'127.0.0.1', port=9094, id=2)>,
-#     1: <pykafka.broker.Broker at 0x7f616471b390 (host=b'127.0.0.1', port=9093, id=1)>
-# }
-for broker in client.brokers:
-    id = client.brokers[broker].id
-    host = client.brokers[broker].host
-    port = client.brokers[broker].port
-    print(f'{id} {host.decode()}:{port}')
-# 2 127.0.0.1:9094
-# 1 127.0.0.1:9093
+        # 查看已创建的节点
+        print(self.client.brokers)
+        # {
+        #     2: <pykafka.broker.Broker at 0x7f6169e0e650 (host=b'127.0.0.1', port=9094, id=2)>,
+        #     1: <pykafka.broker.Broker at 0x7f616471b390 (host=b'127.0.0.1', port=9093, id=1)>
+        # }
+        for broker in self.client.brokers:
+            id = self.client.brokers[broker].id
+            host = self.client.brokers[broker].host
+            port = self.client.brokers[broker].port
+            print(f'{id} {host.decode()}:{port}')
+        # 2 127.0.0.1:9094
+        # 1 127.0.0.1:9093
 
-# 查看链接的节点
-print(client.cluster)
-# <pykafka.cluster.Cluster at 0x7f6169dfbc10 (hosts=127.0.0.1:9093)>
+        # 查看链接的节点
+        print(self.client.cluster)
+        # <pykafka.cluster.Cluster at 0x7f5fad7aa3d0 (hosts=127.0.0.1:9093, 127.0.0.1:9094)>
 
-# 获取某个主题 Topic
-topic = client.topics['my-replicated-topic']
-print(topic)
-# <pykafka.topic.Topic at 0x7f5ff9696e90 (name=b'my-replicated-topic')>
-# 如果输入的主题不存在, 默认自动新建这个主题
-new_topic = client.topics['store_topic']
-print(new_topic)
-# <pykafka.topic.Topic at 0x7f47493b4cd0 (name=b'store_topic')>
+        # 查看已有的主题 Topic (假设之前配置 kafka 时所有的主题都被以下命令删除掉了)
+        # /opt/kafka_2.13-2.7.0/bin/kafka-topics.sh --delete --topic 主题名 --zookeeper localhost:2181
+        print(self.client.topics)
+        # {}
 
-# 创建一个同步模式的生产者并推送消息, 只有在确认消息已发送到集群之后, 才会返回调用
-with topic.get_sync_producer() as producer:
-    for i in range(1, 4):
-        producer.produce((f'测试消息 {i ** 2}').encode())
+        # 上面已经查到没有主题, 所以这里如果输入的主题不存在, 默认自动新建这个主题
+        store_topic = self.client.topics['store_topic']
+        print(store_topic)
+        # <pykafka.topic.Topic at 0x7f47493b4cd0 (name=b'store_topic')>
+        print(self.client.topics)
+        # {b'store_topic': <weakref at 0x7fb3a5245c50; to 'Topic' at 0x7fb3a53b29d0>}
+        
 
-# 创建一个消费者并接收消息
-# 注意, 本文件运行多少次就会生产多少次上面的消息并在这里接收到
-# 另外, 如果之前我们使用 kafka 测试时随便输入的内容在这里也会接收到
-consumer = topic.get_simple_consumer()
-print(consumer)
-# <pykafka.simpleconsumer.SimpleConsumer at 0x7f768e032510 (consumer_group=None)>
-for msg in consumer:
-    if msg is not None:
-        print(msg.offset, msg.value.decode())
-# 0 测试消息 1
-# 1 测试消息 4
-# 2 测试消息 9
+if __name__ == '__main__':
+    kafka_obj = PyKafkaTest()
+    kafka_obj.query()
 ```
 
-注意：get_simple_consumer() 如果加了参数，则表示定义了一个具体的消费者
+##### 2) 重复消费示例
+
+```python
+# oms_test/tuils/kafka/pykafka_test.py
+from pykafka import KafkaClient
+from oms_test.settings import KAFKA_HOSTS
+
+
+class PyKafkaTest:
+    """Kafka 基本用法示例"""
+
+    def __init__(self, topic_name=None, consumer_group=None, consumer_id=None):
+        self.hosts = KAFKA_HOSTS
+        self.client = KafkaClient(hosts=self.hosts)
+        self.topic = self.client.topics[topic_name]
+        self.consumer_group = consumer_group
+        self.consumer_id = consumer_id
+
+    def produce(self):
+        """设置一个生产者生产消息"""
+        with self.topic.get_sync_producer() as producer:
+            # print(producer)  # <pykafka.producer.Producer at 0x7f91eb149310>
+            for i in range(5):
+                producer.produce(f'测试消息 {i ** 2}'.encode())
+
+    def consume(self):
+        """设置一个消费者消费消息"""
+        consumer = self.topic.get_simple_consumer()
+        # print(consumer)  # <pykafka.simpleconsumer.SimpleConsumer at 0x7f768e032510 (consumer_group=None)>
+        for msg in consumer:
+            if msg is not None:
+                print(f'{msg.offset}, {msg.value.decode()}')
+
+
+if __name__ == '__main__':
+    kafka_obj = PyKafkaTest(topic_name='store_topic', consumer_group=b'first_consumer', consumer_id=b'first')
+    kafka_obj.produce()
+    kafka_obj.consume()
+
+    
+# 运行结果：
+0 测试消息 0
+1 测试消息 1
+2 测试消息 4
+3 测试消息 9
+4 测试消息 16
+
+# 把 kafka_obj.producer() 注释掉，再多次运行，发现都会有结果，而且结果一样
+# 也就是说，我们定义的这个消费者会重复消费主题中的内容
+if __name__ == '__main__':
+    kafka_obj = PyKafkaTest(topic_name='store_topic', consumer_group=b'first_consumer', consumer_id=b'first')
+    # kafka_obj.producer()
+    kafka_obj.consumer()
+    
+# 再把 kafka_obj.producer() 解注释，多次运行发现不但会重复消费，而且会消费新生成的消息
+```
+
+##### 3) 不重复消费示例
+
+get_simple_consumer() 如果加了参数，则表示定义了一个具体的消费者
 
 如果该消费者消费了一次 Topic 里的内容，则它不会再消费该 Topic 里面同样的内容
 
 ```python
-# oms_test/utils/kafka_conf.py
+# oms_test/tuils/kafka/pykafka_test.py
 from pykafka import KafkaClient
+from oms_test.settings import KAFKA_HOSTS
 
 
-client = KafkaClient(hosts='127.0.0.1:9094')
-topic = client.topics['test_topic']
+class PyKafkaTest:
+    """Kafka 基本用法示例"""
 
-consumer = topic.get_simple_consumer(consumer_group=b'first_consume', auto_commit_interval_ms=1, auto_commit_enable=True,consumer_id=b'first')
-for msg in consumer:
-    if msg is not None:
-        print(msg.offset, msg.value.decode())
-```
+    def __init__(self, topic_name=None, consumer_group=None, consumer_id=None):
+        self.hosts = KAFKA_HOSTS
+        self.client = KafkaClient(hosts=self.hosts)
+        self.topic = self.client.topics[topic_name]
+        self.consumer_group = consumer_group
+        self.consumer_id = consumer_id
 
-执行该 py 文件两次，会发现第一次打印消息，第二次以后不再打印，说明没有消费同样的内容
+    def produce(self):
+        """设置一个生产者生产消息"""
+        with self.topic.get_sync_producer() as producer:
+            print('生产者开始生产消息 ------>')
+            for i in range(5):
+                producer.produce(f'测试消息 {i ** 2}'.encode())
 
-当然，如果生产者推送了新的消息，这个消费者就能再次接收到新的内容，同样只能接收一次
-
-```python
-# oms_test/utils/kafka_conf.py
-from pykafka import KafkaClient
-
-
-client = KafkaClient(hosts='127.0.0.1:9094')
-topic = client.topics['test_topic']
-
-with topic.get_sync_producer() as producer:
-    for i in range(4, 8):
-        producer.produce((f'测试消息 {i ** 2}').encode())
-
-consumer = topic.get_simple_consumer(consumer_group=b'first_consume', auto_commit_interval_ms=1, auto_commit_enable=True,consumer_id=b'first')
-for msg in consumer:
-    if msg is not None:
-        print(msg.offset, msg.value.decode())
-# 第一次执行结果：
-3 测试消息 16
-4 测试消息 25
-5 测试消息 36
-6 测试消息 49
-# 第二次执行结果：
-7 测试消息 16
-8 测试消息 25
-9 测试消息 36
-10 测试消息 49
-......
-```
-
-执行一次上面的内容，发现有打印消息
-
-执行多次，发现 msg.offset 的值越来越大，而每次只会获取生产者最新生成的消息
-
-如果再注释掉生产者代码，执行后发现不会再打印任何消息
-
-这就是 get_simple_consumer() 传参的一个特点之一，可以避免同一个消费者重复消费
-
-如果想重复消费，则不要传任何参数即可
-
-```python
-# oms_test/utils/kafka_conf.py
-from pykafka import KafkaClient
+    def consume(self):
+        """设置一个消费者消费消息"""
+        consumer = self.topic.get_simple_consumer(consumer_group=self.consumer_group, auto_commit_interval_ms=1,
+                                                  auto_commit_enable=True, consumer_id=self.consumer_id)
+        print('消费者开始消费消息 <------')
+        for msg in consumer:
+            if msg is not None:
+                print(f'{msg.offset}, {msg.value.decode()}')
 
 
-client = KafkaClient(hosts='127.0.0.1:9094')
-topic = client.topics['test_topic']
+if __name__ == '__main__':
+    kafka_obj = PyKafkaTest(topic_name='store_topic', consumer_group=b'first_consumer', consumer_id=b'first')
+    kafka_obj.produce()
+    kafka_obj.consume()
 
-consumer = topic.get_simple_consumer()
-for msg in consumer:
-    if msg is not None:
-        print(msg.offset, msg.value.decode())
-# 不传参多次执行，结果一样(生产者不再推送消息的前提下)
-0 测试消息 1
-1 测试消息 4
-2 测试消息 9
-3 测试消息 16
-4 测试消息 25
-5 测试消息 36
-6 测试消息 49
-7 测试消息 16
-8 测试消息 25
-9 测试消息 36
-10 测试消息 49
-11 测试消息 16
-12 测试消息 25
-13 测试消息 36
-14 测试消息 49
-......
-```
-
-当然，也可以定义另一个消费者，这样就会把之前生产者推送的所有消息都会获取到
-
-```python
-# oms_test/utils/kafka_conf.py
-from pykafka import KafkaClient
-
-
-client = KafkaClient(hosts='127.0.0.1:9094')
-topic = client.topics['test_topic']
-
-consumer = topic.get_simple_consumer(consumer_group=b'second_consume', auto_commit_interval_ms=1, auto_commit_enable=True,consumer_id=b'second')
-for msg in consumer:
-    if msg is not None:
-        print(msg.offset, msg.value.decode())
-# 0 测试消息 1
-# 1 测试消息 4
-# 2 测试消息 9
-# 3 测试消息 16
-# 4 测试消息 25
-# 5 测试消息 36
-......
+# 多次运行发现，消费者只会消费生产者生产的最新消息
+# 验证方式：把 kafka_obj.producer() 注释掉运行，发现什么消息也没有
+# 这就是 get_simple_consumer() 传参的一个特点之一，可以避免同一个消费者重复消费
+# 当然，也可以定义另一个消费者，这样就会把之前生产者推送的所有消息都会获取到, 比如：
+if __name__ == '__main__':
+    kafka_obj = PyKafkaTest(topic_name='store_topic', consumer_group=b'second_consumer', consumer_id=b'second')
+    kafka_obj.producer()
+    kafka_obj.consumer()
+# 运行结果：
+生产者开始生产消息 ------>
+消费者开始消费消息 <------
+0, 测试消息 0
+1, 测试消息 1
+2, 测试消息 4
+3, 测试消息 9
+4, 测试消息 16
+5, 测试消息 0
+6, 测试消息 1
+7, 测试消息 4
+8, 测试消息 9
+9, 测试消息 16
 ```
 
 ### 项目中日志使用示例
@@ -819,14 +836,14 @@ for msg in consumer:
 
 ```python
 # oms_test/oms_conf/oms_log.py
-########## 日志路径配置 ##########
+"""日志路径配置"""
 import os
 import loguru
 from pathlib import Path
 from datetime import datetime
 
 
-########## 基础路径配置 ##########
+# 基础路径配置
 logger = loguru.logger
 current_time = datetime.now().strftime('%Y-%m-%d')
 base_dir = Path(__file__).resolve().parent.parent
@@ -835,7 +852,7 @@ log_base_path = f'{base_dir}/log/{current_time}/'
 if not os.path.exists(log_base_path):
     os.makedirs(log_base_path, exist_ok=False)
 
-########## kafka路径配置 ###########
+# kafka 路径配置
 kafka_log = f'{log_base_path}/kafka/'
 ```
 
@@ -847,54 +864,69 @@ kafka_log = f'{log_base_path}/kafka/'
 # oms_test/oms_test/settings.py
 from oms_conf import oms_db, oms_redis, oms_kafka, oms_log
 ......
-# Redis 配置
-REDIS_CONF = oms_redis.REDIS_CONF
-
-# Kafka 配置
-KAFKA_HOST = oms_kafka.KAFKA_HOST
-KAFKA_PORT = oms_kafka.KAFKA_PORT
-
-REST_FRAMEWORK = {
-    # 全局设置, 默认所有接口都需要被验证
-    'DEFAULT_PERMISSION_CLASSES': (
-        'utils.permissions.APIPermission',
-        # 'utils.permissions.IsIdempotent',
-    ),
-}
-
-########## 日志配置 ##########
+# 日志配置
 KAFKA_LOG = oms_log.kafka_log
 ```
 
-#### 3. kafka 日志
+#### 3. kafka 日志使用示例
 
 ```python
-# oms_test/utils/kafka_conf/kafka_consumer.py
+# oms_test/utils/kafka/pykafka_test.py
 import loguru
 from pykafka import KafkaClient
-from oms_test.settings import KAFKA_LOG, KAFKA_HOST, KAFKA_PORT
-
+from oms_test.settings import KAFKA_HOSTS, KAFKA_LOG
 logger = loguru.logger
-logger.add(f'{KAFKA_LOG}kafka_test.log', format='{time} {level} {message}', level='INFO')
+logger.add(f'{KAFKA_LOG}pykafka_test.log', format='{time} {level} {message}', level='INFO')
 
-class SimpleConsumer:
 
-    def __init__(self):
-        self.host = KAFKA_HOST
-        self.port = KAFKA_PORT
+class PyKafkaTest:
+    """Kafka 基本用法示例"""
 
-    def run(self):
-        logger.info('=============== kafka consumer start ===============')
-        client = KafkaClient(hosts=f'{self.host}:{self.port}')
+    def __init__(self, topic_name=None, consumer_group=None, consumer_id=None):
+        self.hosts = KAFKA_HOSTS
+        self.client = KafkaClient(hosts=self.hosts)
+        self.topic = self.client.topics[topic_name]
+        self.consumer_group = consumer_group
+        self.consumer_id = consumer_id
 
+    def produce(self):
+        """设置一个生产者生产消息"""
+        with self.topic.get_sync_producer() as producer:
+            logger.info('生产者开始生产消息 ------>')
+            for i in range(5):
+                producer.produce(f'测试消息 {i ** 2}'.encode())
+
+    def consume(self):
+        """设置一个消费者消费消息"""
+        consumer = self.topic.get_simple_consumer(consumer_group=self.consumer_group, auto_commit_interval_ms=1,
+                                                  auto_commit_enable=True, consumer_id=self.consumer_id)
+        logger.info('消费者开始消费消息 <------')
+        for msg in consumer:
+            if msg is not None:
+                logger.info(f'{msg.offset}, {msg.value.decode()}')
 
 
 if __name__ == '__main__':
-    c_obj = SimpleConsumer()
-    c_obj.run()
+    kafka_obj = PyKafkaTest(topic_name='store_topic', consumer_group=b'first_consumer', consumer_id=b'first')
+    kafka_obj.produce()
+    kafka_obj.consume()
+
+# 运行结果：会生成一个 log 文件，并且 PyCharm 终端内也有消息输出
+2021-02-04 13:52:26.930 | INFO     | __main__:producer:21 - 生产者开始生产消息 ------>
+2021-02-04 13:52:31.947 | INFO     | __main__:consumer:29 - 消费者开始消费消息 <------
+2021-02-04 13:52:31.957 | INFO     | __main__:consumer:32 - 25, 测试消息 0
+2021-02-04 13:52:31.957 | INFO     | __main__:consumer:32 - 26, 测试消息 1
+2021-02-04 13:52:31.958 | INFO     | __main__:consumer:32 - 27, 测试消息 4
+2021-02-04 13:52:31.959 | INFO     | __main__:consumer:32 - 28, 测试消息 9
+2021-02-04 13:52:31.960 | INFO     | __main__:consumer:32 - 29, 测试消息 16
+2021-02-04 13:52:31.961 | INFO     | __main__:consumer:32 - 30, 测试消息 0
+2021-02-04 13:52:31.962 | INFO     | __main__:consumer:32 - 31, 测试消息 1
+2021-02-04 13:52:31.963 | INFO     | __main__:consumer:32 - 32, 测试消息 4
+2021-02-04 13:52:31.965 | INFO     | __main__:consumer:32 - 33, 测试消息 9
+2021-02-04 13:52:31.966 | INFO     | __main__:consumer:32 - 34, 测试消息 16
 ```
 
-运行该文件，发现 log 目录下有当前日期的目录，里面有 kafka 目录，最里面是 kafka_test.log
+运行该文件，发现 log 目录下有当前日期的目录，里面有 kafka 目录，最里面是 pykafka_test.log
 
 #### 4. 忽略文件添加日志信息
 
@@ -918,5 +950,137 @@ git rm -r -f --cached .
 git add .
 git commit -m '日志的基本使用及上传代码时忽略日志文件'
 git push origin master
+```
+
+### aiokafka 与 kafka-python 库的配合使用
+
+> 参考资料：https://aiokafka.readthedocs.io/en/stable/index.html
+
+- `aiokafka`：一个针对 Kafka 的异步客户端
+- `AIOKafkaProducer`：一个高级异步消息生成器
+- `AIOKafkaConsumer`：一个高级的异步消息使用者。它与指定的 Kafka 组协调器节点交互，以允许多个使用者负载平衡主题的使用（要求 Kafka >= 0.9.0.0）
+- `aiokafka`是使用 [asyncio](http://docs.python.org/3.7/library/asyncio.html) 的 `Apache Kafka` 分布式流处理系统的客户端。它基于 [kafka-python](https://github.com/dpkp/kafka-python) 库，并且将其内部结构重新用于协议解析，错误等。该客户端的设计功能非常类似于官方 `Java` 客户端，并带有大量 Pythonic 接口
+
+#### 1. 安装 asyncio 和 aiokafka
+
+```bash
+pip install asyncio
+pip install aiokafka
+```
+
+#### 2. 简单使用示例
+
+```python
+# 在 pykafka_test.py 同目录下新建 kafka_python_test.py 
+# oms_test/utils/kafka/kafka_python_test.py
+import loguru
+import asyncio
+from oms_test.settings import KAFKA_LOG, KAFKA_HOSTS
+from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+logger = loguru.logger
+logger.add(f'{KAFKA_LOG}kafka_python_test.log', format='{time} {level} {message}', level='INFO')
+
+
+class KafkaPythonTest:
+
+    def __init__(self, topic_name=None, group_id=None):
+        self.topic_name = topic_name
+        self.group_id = group_id
+        self.hosts = KAFKA_HOSTS
+        self.loop = asyncio.get_event_loop()
+
+    def produce(self):
+        """生产者测试"""
+        async def producer_obj():
+            """定义一个生产者"""
+            producer = AIOKafkaProducer(
+                loop=self.loop,
+                bootstrap_servers=self.hosts
+            )
+            await producer.start()
+            try:
+                produce_msg = '实时消息测试'
+                # 选择某个主题
+                await producer.send_and_wait(self.topic_name, produce_msg.encode())
+                logger.info(f'生产者发送消息："{produce_msg}" 成功!')
+            except Exception as e:
+                logger.info(f'生产者发送消息失败：{e}')
+            finally:
+                await producer.stop()
+
+        self.loop.run_until_complete(producer_obj())
+
+        return
+
+    def consume(self):
+        """消费者测试"""
+        async def consumer_obj():
+            """定义一个消费者"""
+            consumer = AIOKafkaConsumer(
+                self.topic_name,
+                loop=self.loop,
+                bootstrap_servers=self.hosts,
+                # 设置一个 group_id, 这样这个消费者只消费一次消息, 不重复消费
+                group_id=self.group_id
+            )
+            await consumer.start()
+            try:
+                async for msg in consumer:
+                    # print(f'consumed: {msg.topic}, {msg.partition}, {msg.offset}, {msg.key}, {msg.value.decode()}, {msg.timestamp}')
+                    logger.info(f'消费者接收消息："{msg.value.decode()}" 成功!')
+            except Exception as e:
+                logger.info(f'消费者接收消息失败：{e}')
+            finally:
+                await consumer.stop()
+
+        self.loop.run_until_complete(consumer_obj())
+
+        return
+
+
+if __name__ == '__main__':
+    # 注意：因为 kafka 的生产与消费都是实时的, 因此必须先让生产者实时发送一条消息, 这样消费者才能实时接收到
+    # 如果不开启生产者发送消息, 消费者会一直等着接收生产者实时发送的消息, 只要生产者不发送消息, 消费者就会一直等着, 不会结束运行
+    kafka_obj = KafkaPythonTest(topic_name='store_topic', group_id='first_group')
+    kafka_obj.produce()
+    kafka_obj.consume()
+
+# 运行结果：
+2021-02-04 14:04:17.993 | INFO     | __main__:producer_obj:30 - 生产者发送消息："实时消息测试" 成功!
+2021-02-04 14:04:24.246 | INFO     | __main__:consumer_obj:55 - 消费者接收消息："实时消息测试" 成功!
+```
+
+#### 3. 项目中 kafka_python 与 MySQL 使用示例
+
+##### 1) MySQL 数据库连接池（Connection pooling）
+
+- 如果所有线程都连接一个 MySQL，那么当它挂掉后，程序也会出现问题。比如在每次执行一个 sql 语句的时候都建立一个 MySQL 连接，执行完就关掉，那么在大数据面前这样频繁开关一个 MySQL 连接，很容易消耗资源，而且容易挂掉
+
+- 而使用数据库连接池则是一个很好的解决办法，它是程序启动时建立足够的数据库连接，并将这些连接组成一个连接池。通过程序动态地对池中的连接进行申请、使用及释放。这样集中管理，供程序使用可以保证较快的数据读写速度，而且不用来回创建数据库的连接，节省时间，也更加安全可靠。简单来说，数据库连接池的优点：减少连接次数，并且支持高并发
+
+##### 2) 安装必要包
+
+```bash
+# DBUtils 用来实现数据库连接池的功能，能提升 MySQL 的执行效率
+pip install DBUtils
+# configparser 用来读取 MySQL 配置文件的内容
+# 参考资料：https://www.cnblogs.com/zhou2019/p/10599953.html
+# PS：其实可以直接在 oms_db.py 文件里读取 MySQL 配置信息的，这里就当作学习如何读取 MySQL 配置文件内容
+pip install configparser
+```
+
+##### 3) 新建 MySQL 配置文件
+
+```python
+# 1. oms_conf 目录下新建 oms_db.cnf 文件，新增内容：
+# 主库配置
+[dbMysql]
+host=127.0.0.01
+port=3306
+user=root
+password=123456
+db_name=oms_test
+
+# 2. utils 目录下新建 mysql 这个 Python 包，里面新建文件：mysql_interface.py
 ```
 

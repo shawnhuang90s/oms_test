@@ -90,8 +90,7 @@ API_DOC_ROOT = os.path.join(BASE_DIR, 'api_doc/')
 REDIS_CONF = oms_redis.REDIS_CONF
 
 # Kafka 配置
-KAFKA_HOST = oms_kafka.KAFKA_HOST
-KAFKA_PORT = oms_kafka.KAFKA_PORT
+KAFKA_HOSTS = oms_kafka.KAFKA_HOSTS
 
 REST_FRAMEWORK = {
     # 全局设置, 默认所有接口都需要被验证
