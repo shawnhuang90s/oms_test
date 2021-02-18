@@ -54,9 +54,9 @@ def send_store_info():
                 附件是店铺相关信息
                 相关详情烦请查看 excel 文件, 谢谢!"""
                 SendEmail(
-                    user='xingye@starmerx.com',
-                    password='Hsz1990486',
-                    to_list=['xingye@starmerx.com'],
+                    user='输入发送者的邮箱账号',
+                    password='输入发送者的邮箱账号密码',
+                    to_list=['接收者的邮箱账号(可以是同一个)'],
                     tag=f'店铺信息整理',
                     content={
                         'content': content,

@@ -328,7 +328,7 @@ def send_store_info():
                 SendEmail(
                     user='输入发送者的邮箱账号',
                     password='输入发送者的邮箱账号密码',
-                    to_list=['接收者的邮箱账号（可以是同一个）'],
+                    to_list=['接收者的邮箱账号(可以是同一个)'],
                     tag=f'店铺信息整理',
                     content={
                         'content': content,

@@ -45,18 +45,22 @@ class KafkaConsumerInterface:
         finally:
             await consumer.stop()
 
-    def join(self, topics):
+    async def join(self, topics):
         """将 kafka 消费者加入事件循环"""
         for topic in topics:
+            print(111111111111111111)
+            print(topic)
+            print(self.loop)
             consumer = AIOKafkaConsumer(
                 topic,
                 group_id='store',
                 loop=self.loop,
                 bootstrap_servers=KAFKA_HOSTS,
-                session_timeout_ms=2*10000,
-                heartbeat_interval_ms=2*3000,
-                max_partition_fetch_bytes=15*1024*1024
+                # session_timeout_ms=2*10000,
+                # heartbeat_interval_ms=2*3000,
+                # max_partition_fetch_bytes=15*1024*1024
             )
+            print(2222222222222222222222)
             self.tasks.append(self._run(consumer))
 
     def run(self):
@@ -90,7 +94,7 @@ class KafkaProductInterface:
         """将消息放进列表中"""
         self.msg_list.append(msg)
 
-    async def _send(self):
+    async def _send(self, msg):
         """发送消息"""
         producer = AIOKafkaProducer(loop=self.loop, bootstrap_servers=self.hosts)
         await producer.start()
@@ -111,18 +115,18 @@ class KafkaProductInterface:
             partitions = await producer.partitions_for(self.topic)
             partition = random.choice(tuple(partitions))
             await producer.send_batch(batch, self.topic, partition=partition)
-            logger.warning(f'发送 {len(copied_list)} 条消息到 topic:{self.topic}, partition:{partition}')
+            logger.warning(f'发送 {len(copied_list)} 条消息：{copied_list} 到 topic:{self.topic}, partition:{partition}')
         finally:
             # 等待所有待发消息被发送出去或者过期
             await producer.stop()
 
-    def async_send(self):
+    def send(self, msg):
         """异步发送消息入口, 适用高并发场景"""
         try:
             if self.loop.is_running():
-                self.loop.create_task((self._send()))
+                self.loop.create_task((self._send(msg)))
             else:
-                self.loop.run_until_complete(self._send())
+                self.loop.run_until_complete(self._send(msg))
         except Exception as e:
             logger.error(f'kafka 生产者事件循环时发生异常：{e}')
 
@@ -130,6 +134,14 @@ class KafkaProductInterface:
         """同步发送消息入口, 适用低并发场景"""
         try:
             self.put(msg)
-            self.async_send()
+            self.send(msg)
         except Exception as e:
             logger.error(f'kafka 发送消息：{msg} 失败：{e}')
+
+
+if __name__ == '__main__':
+    producer = KafkaProductInterface('store_topic')
+    producer.sync_send('这是一次测试')
+    consumer = KafkaConsumerInterface()
+    consumer.join(['store_topic'])
+    consumer.run()

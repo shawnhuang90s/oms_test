@@ -1050,7 +1050,15 @@ if __name__ == '__main__':
 2021-02-04 14:04:24.246 | INFO     | __main__:consumer_obj:55 - 消费者接收消息："实时消息测试" 成功!
 ```
 
-#### 3. 项目中 kafka_python 与 MySQL 使用示例
+#### 3. 高并发时的使用示例
+
+```python
+
+```
+
+
+
+#### 4. 项目中 kafka_python 与 MySQL 使用示例
 
 ##### 1) MySQL 数据库连接池（Connection pooling）
 
