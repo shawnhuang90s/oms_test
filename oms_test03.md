@@ -1063,54 +1063,6 @@ logger = loguru.logger
 logger.add(f'{KAFKA_LOG}kafka_python_interface.log', format='{time} {level} {message}', level='INFO')
 
 
-class KafkaConsumerInterface:
-    """kafka 消费者接口"""
-
-    def __init__(self, topic):
-        self.topic = topic
-        self.hosts = KAFKA_HOSTS
-        self.loop = asyncio.get_event_loop()
-
-    def deal_with_msg(self, msg):
-        """处理消费者接收的消息"""
-        pass
-
-    async def consumer_msg(self):
-        """消费消息"""
-        # 定义一个消费者
-        consumer = AIOKafkaConsumer(
-            self.topic,
-            group_id='store_account',
-            loop=self.loop,
-            bootstrap_servers=KAFKA_HOSTS,
-            session_timeout_ms=2 * 10000,
-            heartbeat_interval_ms=2 * 3000,
-            max_partition_fetch_bytes=15 * 1024 * 1024
-        )
-        await consumer.start()
-        try:
-            async for message in consumer:
-                msg = message.value.decode('utf-8')
-                logger.info(f'偏移量：{message.offset} 消息：{msg}')
-                self.deal_with_msg(msg)
-        except Exception as e:
-            logger.error(f'消费 kafka 消息时报错：{e}')
-        finally:
-            await consumer.stop()
-
-    def receive(self):
-        """接收消息接口"""
-        try:
-            logger.warning('======== kafka 消费者事件循环开启 ========')
-            if self.loop.is_running():
-                self.loop.create_task(self.consumer_msg())
-            else:
-                self.loop.create_task(self.consumer_msg())
-                self.loop.run_forever()
-        finally:
-            logger.warning('======== kafka 消费者事件循环结束 ========')
-
-
 class KafkaProductInterface:
     """kafka 生产者接口"""
 
@@ -1175,6 +1127,54 @@ class KafkaProductInterface:
             logger.error(f'kafka 发送消息：{msg} 失败：{e}')
 
 
+class KafkaConsumerInterface:
+    """kafka 消费者接口"""
+
+    def __init__(self, topic):
+        self.topic = topic
+        self.hosts = KAFKA_HOSTS
+        self.loop = asyncio.get_event_loop()
+
+    def deal_with_msg(self, msg):
+        """处理消费者接收的消息"""
+        pass
+
+    async def consumer_msg(self):
+        """消费消息"""
+        # 定义一个消费者
+        consumer = AIOKafkaConsumer(
+            self.topic,
+            group_id='store_account',
+            loop=self.loop,
+            bootstrap_servers=KAFKA_HOSTS,
+            session_timeout_ms=2 * 10000,
+            heartbeat_interval_ms=2 * 3000,
+            max_partition_fetch_bytes=15 * 1024 * 1024
+        )
+        await consumer.start()
+        try:
+            async for message in consumer:
+                msg = message.value.decode('utf-8')
+                logger.info(f'偏移量：{message.offset} 消息：{msg}')
+                self.deal_with_msg(msg)
+        except Exception as e:
+            logger.error(f'消费 kafka 消息时报错：{e}')
+        finally:
+            await consumer.stop()
+
+    def receive(self):
+        """接收消息接口"""
+        try:
+            logger.warning('======== kafka 消费者事件循环开启 ========')
+            if self.loop.is_running():
+                self.loop.create_task(self.consumer_msg())
+            else:
+                self.loop.create_task(self.consumer_msg())
+                self.loop.run_forever()
+        finally:
+            logger.warning('======== kafka 消费者事件循环结束 ========')
+
+
 if __name__ == '__main__':
     producer = KafkaProductInterface(topic='store_topic')
     producer.send(msg='this is a test...')
@@ -1187,17 +1187,102 @@ if __name__ == '__main__':
 2021-02-22 14:39:15.388 | INFO     | __main__:consumer_msg:38 - 偏移量：26 消息：this is a test...
 ```
 
+### 项目中 pykafka 库与 MySQL 使用示例
+
+#### 1. pykafka 接口
+
+```python
+# oms_test/utils/kafka/pykafka_interface.py
+import json
+import loguru
+from pykafka import KafkaClient
+from oms_test.settings import KAFKA_HOSTS, KAFKA_LOG
+from pykafka.exceptions import SocketDisconnectedError, LeaderNotAvailable
+logger = loguru.logger
+logger.add(f'{KAFKA_LOG}pykafka_interface.log', format='{time} {level} {message}', level='INFO')
 
 
-#### 4. 项目中 kafka_python 与 MySQL 使用示例
+class PykafkaInterface:
+    """kafka 连接"""
 
-##### 1) MySQL 数据库连接池（Connection pooling）
+    def __init__(self, topic):
+        self.hosts = KAFKA_HOSTS
+        self.client = KafkaClient(hosts=self.hosts)
+        self.topic = self.client.topics[topic]
+
+
+class ProducerInterface(PykafkaInterface):
+    """生产者接口"""
+
+    def __init__(self, topic):
+        super().__init__(topic)
+        self.producer = self.topic.get_sync_producer()
+
+    def send(self, msg):
+        """生产者生产消息"""
+        try:
+            msg = json.dumps(msg)
+            self.producer.produce(msg.encode('utf-8'))
+            logger.info(f'发送消息：{msg} 成功!')
+        except (SocketDisconnectedError, LeaderNotAvailable):
+            # self.producer.start()
+            logger.warning(f'生产者生成消息时报错, 正在尝试重启生产者')
+            self.producer.stop()
+            self.producer.start()
+            msg = json.dumps(msg)
+            self.producer.produce(msg.encode('utf-8'))
+        except Exception as e:
+            logger.info(f'生产者生产消息时报错：{e}')
+
+
+class ConsumerInterface(PykafkaInterface):
+    """消费者接口"""
+
+    def __init__(self, topic, consumer_group, consumer_id):
+        super().__init__(topic)
+        self.consumer_group = consumer_group
+        self.consumer_id = consumer_id
+        self.consumer = self.topic.get_simple_consumer(consumer_group=self.consumer_group, auto_commit_interval_ms=1,
+                                                       auto_commit_enable=True, consumer_id=self.consumer_id)
+
+    def handle(self, msg, func):
+        """处理消费的消息"""
+        logger.info(f'offset:{msg.offset} | value:{msg.value} | partitions:{self.consumer.partitions}')
+        return func(json.loads(msg.value.decode('utf-8')))
+
+    def receive(self, func):
+        """消费消息"""
+        try:
+            for msg in self.consumer:
+                if msg:
+                    self.handle(msg, func)
+        except SocketDisconnectedError:
+            logger.warning(f'消费消息时报错, 正在尝试重启消费者')
+            self.consumer.stop()
+            self.consumer.start()
+        except Exception as e:
+            logger.warning(f'消费消息时报错：{e}')
+
+
+def test(msg):
+    print(f'实时接收消息：{msg}')
+    return
+
+
+if __name__ == '__main__':
+    producer = ProducerInterface(topic='store_topic')
+    producer.send('this is a test...')
+    consumer = ConsumerInterface(topic='store_topic', consumer_group=b'first_consumer', consumer_id=b'first')
+    consumer.receive(func=test)
+```
+
+#### 2. MySQL 数据库连接池（Connection pooling）
 
 - 如果所有线程都连接一个 MySQL，那么当它挂掉后，程序也会出现问题。比如在每次执行一个 sql 语句的时候都建立一个 MySQL 连接，执行完就关掉，那么在大数据面前这样频繁开关一个 MySQL 连接，很容易消耗资源，而且容易挂掉
 
 - 而使用数据库连接池则是一个很好的解决办法，它是程序启动时建立足够的数据库连接，并将这些连接组成一个连接池。通过程序动态地对池中的连接进行申请、使用及释放。这样集中管理，供程序使用可以保证较快的数据读写速度，而且不用来回创建数据库的连接，节省时间，也更加安全可靠。简单来说，数据库连接池的优点：减少连接次数，并且支持高并发
 
-##### 2) 安装必要包
+#### 3. 安装必要包
 
 ```bash
 # DBUtils 用来实现数据库连接池的功能，能提升 MySQL 的执行效率
@@ -1208,10 +1293,10 @@ pip install DBUtils
 pip install configparser
 ```
 
-##### 3) 新建 MySQL 配置文件
+#### 4. 新建 MySQL 配置文件
 
 ```python
-# 1. oms_conf 目录下新建 oms_db.cnf 文件，新增内容：
+# oms_conf 目录下新建 oms_db.cnf 文件，新增内容：
 # 主库配置
 [dbMysql]
 host=127.0.0.01
@@ -1219,7 +1304,302 @@ port=3306
 user=root
 password=123456
 db_name=oms_test
+```
 
-# 2. utils 目录下新建 mysql 这个 Python 包，里面新建文件：mysql_interface.py
+#### 5. MySQL 接口
+
+```python
+# utils 目录下新建 mysql 这个 Python 包，里面新建文件：mysql_interface.py
+# oms_test/utils/mysql/mysql_interface.py
+import pymysql
+import configparser
+from pymysql.cursors import DictCursor
+from dbutils.pooled_db import PooledDB
+from oms_test.settings import BASE_DIR
+
+
+class Config:
+    """
+    读取 MySQL 配置文件信息
+    [dbMysql]
+    host=127.0.0.01
+    port=3306
+    user=root
+    password=123456
+    db_name=oms_test
+    """
+    def __init__(self, config_filename=None):
+        self.file_path = f'{BASE_DIR}/oms_conf/{config_filename}'
+        self.parsing_obj = configparser.ConfigParser()
+        self.parsing_obj.read(self.file_path)
+
+    def get_section_list(self):
+        """读取配置文件中的 [] 里的对象名, 比如这里的 ['dbMysql']"""
+        return self.parsing_obj.sections()
+
+    def get_option_list(self, section):
+        """获取指定的某个 [] 对象下面包含的内容, 比如这里的 ['dbMysql'] 下面的配置内容"""
+        return self.parsing_obj.options(section)
+
+    def get_content_dict(self, section):
+        """获取每个字段对应的值并放进一个字典中"""
+        ret = dict()
+        for option in self.get_option_list(section):
+            value = self.parsing_obj.get(section, option)
+            ret[option] = int(value) if value.isdigit() else value
+        return ret
+
+
+class BasePyMySQLPool:
+
+    def __init__(self, host, port, user, password, db_name):
+        self.host = host
+        self.port = port
+        self.user = user
+        # 注意密码要转化成字符串形式
+        self.password = str(password)
+        self.db_name = db_name
+
+
+class PyMySQLPool(BasePyMySQLPool):
+    """
+    MySQL 数据库对象, 负责产生数据库连接
+    此类中的连接采用连接池实现获取连接对象
+    """
+    __pool = None
+
+    def __init__(self, config_filename, conf_name):
+        """初始化时设置数据库构造函数, 从连接池中获取连接, 并生成操作游标"""
+        conf_obj = Config(config_filename=config_filename)
+        self.conf_dict = conf_obj.get_content_dict(section=conf_name)
+        super(PyMySQLPool, self).__init__(**self.conf_dict)
+        self.conn = self.get_conn()
+        self.cursor = self.conn.cursor()
+
+    def get_conn(self):
+        """从连接池中获取连接"""
+        if self.__pool is None:
+            self.__pool = PooledDB(
+                creator=pymysql,
+                mincached=1,
+                maxcached=20,
+                host=self.host,
+                port=self.port,
+                user=self.user,
+                passwd=self.password,
+                db=self.db_name,
+                use_unicode=False,
+                charset='utf8',
+                cursorclass=DictCursor
+            )
+        return self.__pool.connection()
+
+    def execute_sql(self, sql, param=None):
+        """
+        执行 sql 语句, 获取查询数量
+        :param sql: sql 查询语句
+        :param param: 如果有查询条件, 只需传递条件列表值 (元组/列表)
+        :return: 受影响的行数
+        """
+        if not param:
+            count = self.cursor.execute(sql)
+        else:
+            count = self.cursor.execute(sql, param)
+        return count
+
+    def get_all(self, sql, param=None):
+        """
+        执行 sql 查询语句, 获取所有数据
+        :param sql: sql 查询语句
+        :param param: 如果有查询条件, 只需传递条件列表值 (元组/列表)
+        :return: 查询结果为字典对象或布尔值
+        """
+        count = self.execute_sql(sql, param)
+        if count > 0:
+            ret = self.cursor.fetchall()
+        else:
+            ret = False
+        return ret
+
+    def get_one(self, sql, param=None):
+        """
+        执行 sql 查询语句, 获取第一条数据
+        :param sql: sql 查询语句
+        :param param: 如果有查询条件, 只需传递条件列表值 (元组/列表)
+        :return: 查询结果为字典对象或布尔值
+        """
+        count = self.execute_sql(sql, param)
+        if count > 0:
+            ret = self.cursor.fetchone()
+        else:
+            ret = False
+        return ret
+
+    def get_many(self, sql, num, param=None):
+        """
+        执行 sql 查询语句, 获取 num 条数据
+        :param sql: sql 查询语句
+        :param num: 指定获取 num 条数据
+        :param param: 如果有查询条件, 只需传递条件列表值 (元组/列表)
+        :return: 查询结果为字典对象或布尔值
+        """
+        count = self.execute_sql(sql, param)
+        if count > 0:
+            ret = self.cursor.fetchmany(num)
+        else:
+            ret = False
+        return ret
+
+    def insert(self, sql, param=None):
+        """
+        向数据表插入一条记录
+        :param sql: sql 插入语句
+        :param param: 要插入的某条记录
+        :return: 受影响的行数
+        """
+        return self.execute_sql(sql, param)
+
+    def insert_many(self, sql, param):
+        """
+        向数据表插入多条记录
+        :param sql: sql 插入语句
+        :param param: 要更新的多条记录 (列表或元组)
+        :return: 受影响的行数
+        """
+        count = self.cursor.executemany(sql, param)
+        return count
+
+    def update(self, sql, param=None):
+        """
+        更新数据表记录
+        :param sql: sql 更新语句
+        :param param: 要更新的值 (列表或元组)
+        :return: 受影响的行数
+        """
+        return self.execute_sql(sql, param)
+
+    def replace(self, sql, param=None):
+        """
+        插入更新数据表记录
+        :param sql: sql 插入更新语句
+        :param param: 要插入更新的值 (列表或元组)
+        :return: 受影响的行数
+        """
+        return self.execute_sql(sql, param)
+
+    def delete(self, sql, param=None):
+        """
+        删除数据表记录
+        :param sql: sql 删除语句
+        :param param: 要删除的记录 (列表或元组)
+        :return: 受影响的行数
+        """
+        return self.execute_sql(sql, param)
+
+    def begin(self):
+        """开启事务"""
+        self.conn.autocommit(0)
+
+    def end(self, option='commit'):
+        """结束事务"""
+        if option == 'commit':
+            self.conn.commit()
+        else:
+            self.conn.rollback()
+
+    def dispose(self, is_end=1):
+        """释放连接池资源"""
+        if is_end == 1:
+            self.end('commit')
+        else:
+            self.end('rollback')
+        self.cursor.close()
+        self.conn.close()
+
+
+if __name__ == '__main__':
+    obj = Config('oms_db.cnf')
+    section_list = obj.get_section_list()
+    for section in section_list:
+        options_list = obj.get_option_list(section)
+        print(options_list)  # ['host', 'port', 'user', 'password', 'db_name']
+        content_dict = obj.get_content_dict(section)
+        print(content_dict)  # {'host': '127.0.0.01', 'port': 3306, 'user': 'root', 'password': 123456, 'db_name': 'oms_test'}
+```
+
+#### 6. 模拟 Kafka 生产者与消费者
+
+```python
+# store/views 目录下新建 store_kafka.py
+# oms_test/store/views/store_kafka.py
+import loguru
+from datetime import datetime
+from oms_test.settings import KAFKA_LOG
+from utils.mysql.mysql_interface import PyMySQLPool
+from utils.kafka.pykafka_interface import ProducerInterface, ConsumerInterface
+
+logger = loguru.logger
+logger.add(f'{KAFKA_LOG}store_kafka.log', format='{time} {level} {message}', level='INFO')
+
+
+def save_account_info(account_msg=None):
+    """将消费者获取的店铺账户信息保存到表中"""
+    if account_msg and isinstance(account_msg, dict):
+        if account_msg['table'] == 'oms_store':
+            account_list = account_msg.get('account_list', [])
+            if account_list and isinstance(account_list, list):
+                for account_tuple in account_list:
+                    # 这里注意：虽然我们在生产者推送消息时每个店铺信息放在元组中, 但 json.dumps(msg) 之后, 元组会变成列表
+                    if isinstance(account_tuple, list):
+                        account_tuple = tuple(account_tuple)
+                    try:
+                        mysql_conn = PyMySQLPool(config_filename='oms_db.cnf', conf_name='dbMysql')
+                        name, manager_name, manager_id, center, center_id, platform, market, market_id, status, last_download_time = account_tuple
+                        account_sql = f"REPLACE INTO oms_store (name, manager_name, manager_id, center, center_id, platform, market, market_id, status, last_download_time) VALUES (\'{name}\', \'{manager_name}\', \'{manager_id}\', \'{center}\', \'{center_id}\', \'{platform}\', \'{market}\', \'{market_id}\', \'{status}\', \'{last_download_time}\');"
+                        mysql_conn.replace(account_sql)
+                        logger.info(f'将数据：{account_tuple} 保存到 oms_store 表中成功！')
+                        mysql_conn.dispose()
+                    except Exception as e:
+                        logger.warning(f'将数据：{account_tuple} 保存到 oms_store 表中失败：{e}')
+                        continue
+
+
+def produce_store_account():
+    """店铺账户信息实时推送"""
+    try:
+        producer = ProducerInterface(topic='store_topic')
+        account_msg = {'table': 'oms_store', 'account_list': []}
+        for i in range(200, 501):
+            # oms_store 字段：name, manager_name, manager_id, center, center_id, platform,
+            # market, market_id, status, last_download_time
+            account_tuple = (
+                f'test_store_{i}', f'test_manager_{i}', i, f'test_center_{i}', i, f'test_platform_{i}',
+                f'test_market_{i}', i, 1, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            )
+            account_msg['account_list'].append(account_tuple)
+        producer.send(account_msg)
+    except Exception as e:
+        logger.warning(f'推送店铺账户信息到 kafka 失败：{e}')
+
+
+def consume_store_account():
+    """店铺账户信息实时接收"""
+    try:
+        consumer = ConsumerInterface(topic='store_topic', consumer_group=b'first_test', consumer_id=b'first')
+        consumer.receive(func=save_account_info)
+    except Exception as e:
+        logger.warning(f'从 kafka 获取店铺账户信息失败：{e}')
+
+
+if __name__ == '__main__':
+    produce_store_account()
+    consume_store_account()
+
+# 运行结果：
+2021-02-27 13:43:00.155 | INFO     | utils.kafka.pykafka_interface:send:31 - 发送消息：{"table": "oms_store", "account_list": [["test_store_200", "test_manager_200", 200, "test_center_200", 200, "test_platform_200", "test_market_200", 200, 1, "2021-02-27 13:43:00"], ["test_store_201", "test_manager_201", 201, "test_center_201", 201, "test_platform_201", "test_market_201", 201, 1, "2021-02-27 13:43:00"], ......}
+2021-02-27 13:43:05.184 | INFO     | utils.kafka.pykafka_interface:handle:55 - offset:31 | value:b'{"table": "oms_store", "account_list": [["test_store_200", "test_manager_200", 200, "test_center_200", 200, "test_platform_200", "test_market_200", 200, 1, "2021-02-27 13:43:00"], ["test_store_201", "test_manager_201", 201, "test_center_201", 201, "test_platform_201", "test_market_201", 201, 1, "2021-02-27 13:43:00"],......]}'
+2021-02-27 13:43:05.190 | INFO     | __main__:save_account_info:27 - 将数据：('test_store_200', 'test_manager_200', 200, 'test_center_200', 200, 'test_platform_200', 'test_market_200', 200, 1, '2021-02-27 13:43:00') 保存到 oms_store 表中成功！
+2021-02-27 13:43:05.202 | INFO     | __main__:save_account_info:27 - 将数据：('test_store_201', 'test_manager_201', 201, 'test_center_201', 201, 'test_platform_201', 'test_market_201', 201, 1, '2021-02-27 13:43:00') 保存到 oms_store 表中成功！
+......
 ```
 

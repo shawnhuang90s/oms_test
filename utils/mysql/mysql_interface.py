@@ -39,14 +39,13 @@ class Config:
 
 class BasePyMySQLPool:
 
-    def __init__(self, host, port, user, password, db_name, conn, cursor):
+    def __init__(self, host, port, user, password, db_name):
         self.host = host
         self.port = port
         self.user = user
-        self.password = password
+        # 注意密码要转化成字符串形式
+        self.password = str(password)
         self.db_name = db_name
-        self.conn = conn
-        self.cursor = cursor
 
 
 class PyMySQLPool(BasePyMySQLPool):
@@ -56,9 +55,10 @@ class PyMySQLPool(BasePyMySQLPool):
     """
     __pool = None
 
-    def __init__(self, conf_name):
+    def __init__(self, config_filename, conf_name):
         """初始化时设置数据库构造函数, 从连接池中获取连接, 并生成操作游标"""
-        self.conf_dict = Config.get_content_dict(section=conf_name)
+        conf_obj = Config(config_filename=config_filename)
+        self.conf_dict = conf_obj.get_content_dict(section=conf_name)
         super(PyMySQLPool, self).__init__(**self.conf_dict)
         self.conn = self.get_conn()
         self.cursor = self.conn.cursor()

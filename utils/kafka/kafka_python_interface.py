@@ -7,54 +7,6 @@ logger = loguru.logger
 logger.add(f'{KAFKA_LOG}kafka_python_interface.log', format='{time} {level} {message}', level='INFO')
 
 
-class KafkaConsumerInterface:
-    """kafka 消费者接口"""
-
-    def __init__(self, topic):
-        self.topic = topic
-        self.hosts = KAFKA_HOSTS
-        self.loop = asyncio.get_event_loop()
-
-    def deal_with_msg(self, msg):
-        """处理消费者接收的消息"""
-        pass
-
-    async def consumer_msg(self):
-        """消费消息"""
-        # 定义一个消费者
-        consumer = AIOKafkaConsumer(
-            self.topic,
-            group_id='store_account',
-            loop=self.loop,
-            bootstrap_servers=KAFKA_HOSTS,
-            session_timeout_ms=2 * 10000,
-            heartbeat_interval_ms=2 * 3000,
-            max_partition_fetch_bytes=15 * 1024 * 1024
-        )
-        await consumer.start()
-        try:
-            async for message in consumer:
-                msg = message.value.decode('utf-8')
-                logger.info(f'偏移量：{message.offset} 消息：{msg}')
-                self.deal_with_msg(msg)
-        except Exception as e:
-            logger.error(f'消费 kafka 消息时报错：{e}')
-        finally:
-            await consumer.stop()
-
-    def receive(self):
-        """接收消息接口"""
-        try:
-            logger.warning('======== kafka 消费者事件循环开启 ========')
-            if self.loop.is_running():
-                self.loop.create_task(self.consumer_msg())
-            else:
-                self.loop.create_task(self.consumer_msg())
-                self.loop.run_forever()
-        finally:
-            logger.warning('======== kafka 消费者事件循环结束 ========')
-
-
 class KafkaProductInterface:
     """kafka 生产者接口"""
 
@@ -117,6 +69,54 @@ class KafkaProductInterface:
             self.create_task()
         except Exception as e:
             logger.error(f'kafka 发送消息：{msg} 失败：{e}')
+
+
+class KafkaConsumerInterface:
+    """kafka 消费者接口"""
+
+    def __init__(self, topic):
+        self.topic = topic
+        self.hosts = KAFKA_HOSTS
+        self.loop = asyncio.get_event_loop()
+
+    def deal_with_msg(self, msg):
+        """处理消费者接收的消息"""
+        pass
+
+    async def consumer_msg(self):
+        """消费消息"""
+        # 定义一个消费者
+        consumer = AIOKafkaConsumer(
+            self.topic,
+            group_id='store_account',
+            loop=self.loop,
+            bootstrap_servers=KAFKA_HOSTS,
+            session_timeout_ms=2 * 10000,
+            heartbeat_interval_ms=2 * 3000,
+            max_partition_fetch_bytes=15 * 1024 * 1024
+        )
+        await consumer.start()
+        try:
+            async for message in consumer:
+                msg = message.value.decode('utf-8')
+                logger.info(f'偏移量：{message.offset} 消息：{msg}')
+                self.deal_with_msg(msg)
+        except Exception as e:
+            logger.error(f'消费 kafka 消息时报错：{e}')
+        finally:
+            await consumer.stop()
+
+    def receive(self):
+        """接收消息接口"""
+        try:
+            logger.warning('======== kafka 消费者事件循环开启 ========')
+            if self.loop.is_running():
+                self.loop.create_task(self.consumer_msg())
+            else:
+                self.loop.create_task(self.consumer_msg())
+                self.loop.run_forever()
+        finally:
+            logger.warning('======== kafka 消费者事件循环结束 ========')
 
 
 if __name__ == '__main__':
