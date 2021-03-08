@@ -8,7 +8,7 @@ from django.utils.decorators import method_decorator
 class UserListView(APIView):
     """用户信息展示接口"""
 
-    # @method_decorator(login_auth)
+    @method_decorator(login_auth)
     def get(self, request):
         try:
             user_list = [i.username for i in User.objects.all()]

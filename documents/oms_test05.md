@@ -490,7 +490,489 @@ urlpatterns = [
 ]
 ```
 
-### 
+### 页面数据查看/操作权限管理
+
+#### 1. 新建子应用 basic
+
+```bash
+python manage.py startapp basic
+
+# oms_test/oms_test/settings.py
+INSTALLED_APPS = [
+    ......
+    # 自建应用
+    'store.apps.StoreConfig',
+    'user.apps.UserConfig',
+    'basic.apps.BasicConfig',
+]
+```
+
+#### 2. 新建公共模型类
+
+```python
+# oms_test/utils/base_model.py
+import os
+import django
+from django.db import models
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
+django.setup()
+
+
+class BaseModel(models.Model):
+    """公共模型类"""
+
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    update_time = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        # 定义为抽象基类, 表示迁移数据库的时候忽略这个公共模型类
+        # 换句话说, 数据库不会创建这个模型类对应的表
+        abstract = True
+```
+
+#### 3. 查看/操作权限表与记录表的创建
+
+```python
+from django.db import models
+from user.models import User
+from utils.base_model import BaseModel
+
+
+class PermissionList(BaseModel):
+    """权限接口详情表"""
+
+    id = models.AutoField(primary_key=True)
+    api_url_address = models.CharField(max_length=256, verbose_name="接口地址")
+    request_method = models.CharField(max_length=10, verbose_name="请求方式")
+    permission_name = models.CharField(max_length=128, verbose_name="权限名称")
+
+    class Meta:
+        managed = False
+        db_table = 'oms_permission_list'
+        app_label = 'basic'
+        verbose_name = verbose_name_plural = '权限接口详情表'
+        unique_together = ["api_url_address", "request_method"]
+        
+
+class Permission(BaseModel):
+    """查看/操作权限表"""
+
+    PERMISSION_TYPE = (
+        (0, "查看"),
+        (1, "操作"),
+    )
+    STATE_TYPE = (
+        (0, "禁用"),
+        (1, "启用"),
+    )
+    CATEGORY_TYPE = (
+        (0, '模块1'),
+        (1, '模块2'),
+        (2, '模块3'),
+    )
+    id = models.AutoField(primary_key=True)
+    api_name = models.CharField(max_length=64, null=True, blank=True, verbose_name="界面模块")
+    permission_list = models.CharField(max_length=64, null=True, blank=True, verbose_name="权限ID组合")
+    # 注意：之前有提供用户名接口, 没有传用户ID给前端, 因此这里保存时也只能存用户名. 当然, 也可以在那个接口把 ID 和用户名都传给前端, 这样的话这里保存前端返回的 ID 即可
+    executor = models.CharField(max_length=64, verbose_name="执行人")
+    operator = models.CharField(max_length=64, verbose_name="操作人")
+    permission_type = models.SmallIntegerField(choices=PERMISSION_TYPE, default=0, verbose_name="权限类型")
+    is_active = models.SmallIntegerField(choices=STATE_TYPE, default=0, verbose_name="是否启用(默认启用)")
+    category = models.SmallIntegerField(choices=CATEGORY_TYPE, default=0, verbose_name='模块类别')
+
+    class Meta:
+        managed = False
+        db_table = 'oms_permission'
+        app_label = 'basic'
+        verbose_name = verbose_name_plural = '查看/操作权限表'
+
+
+class PermissionRecord(BaseModel):
+    """查看/操作权限分配记录表"""
+
+    STATE_TYPE = (
+        (0, "禁用"),
+        (1, "启用"),
+    )
+    id = models.AutoField(primary_key=True)
+    permission = models.ForeignKey(Permission, related_name="permission_id", verbose_name="权限ID", on_delete=models.CASCADE)
+    before_change = models.SmallIntegerField(choices=STATE_CHOICES, verbose_name="被修改之前的状态")
+    after_change = models.SmallIntegerField(choices=STATE_CHOICES, verbose_name="被修改之后的状态")
+
+    class Meta:
+        managed = False
+        db_table = 'oms_permission_record'
+        app_label = 'basic'
+        verbose_name = verbose_name_plural = '查看/操作权限记录表'
+```
+
+#### 4. oms_table.sql 表维护并在数据库创建新表
+
+```mysql
+# oms_test/doc/oms_table.sql
+......
+# UNIQUE (`api_url_address`, `request_method`) 设置联合索引
+CREATE TABLE `oms_permission_list` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '权限接口详情ID',
+  `api_url_address` varchar(256) DEFAULT NULL COMMENT '接口地址',
+  `request_method` varchar(10) DEFAULT NULL COMMENT '请求方式',
+  `permission_name` varchar(128) DEFAULT NULL COMMENT '权限名称',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE (`api_url_address`, `request_method`) 
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT '权限接口详情表';
+
+
+CREATE TABLE `oms_permission` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '查看/操作权限ID',
+  `api_name` varchar(64) DEFAULT NULL COMMENT '界面模块',
+  `permission_list` varchar(64) DEFAULT NULL COMMENT '权限ID组合',
+  `executor` varchar(64) DEFAULT NULL COMMENT '执行人',
+  `operator` varchar(64) DEFAULT NULL COMMENT '操作人',
+  `permission_type` tinyint(2) DEFAULT 0 COMMENT '权限类型',
+  `is_active` tinyint(2) DEFAULT 0 COMMENT '是否启用(默认启用)',
+  `category` tinyint(2) DEFAULT 0 COMMENT '模块类别',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT '查看/操作权限表';
+
+
+CREATE TABLE `oms_permission_record` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '查看/操作权限记录ID',
+  `before_change` tinyint(2) DEFAULT NULL COMMENT '被修改之前的状态',
+  `after_change` tinyint(2) DEFAULT NULL COMMENT '被修改之后的状态',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (`id`) REFERENCES oms_permission(id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT '查看/操作权限记录表';
+
+# Pycharm 点击 Database，按照之前的方法执行上面的 SQL 语句即可
+```
+
+#### 5. 添加测试数据示例
+
+```mysql
+========== oms_permission_list ==========
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/stock_application/','POST','FBA备货申请页面数据查询与展示','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/stockapplication/creation/','GET','FBA批量备货模板下载/FBA批量备货处理结果','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/stockapplication/creation/','POST','FBA单个备货/FBA导入批量备货','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/stockapplication/search/','POST','FBA备货审核和进度页面数据查询与展示','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/stockwarehouse/','GET','FBA备货审核和进度页面备货仓下拉展示','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/applicationreviewstates/','GET','FBA备货审核和进度页面计划用时/实际用时数据展示','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/stockapplications/review/','POST','FBA备货审核和进度页面单个/批量备货单审核/驳回','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/stockapplications/revocation/','PUT','FBA备货审核和进度页面单个备货单撤销','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/stockapplications/review/excel/','GET','FBA批量审核模板下载/FBA批量审核处理结果','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/stockapplications/review/excel/','POST','FBA导入批量审核','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/excel/stockapplications/','POST','FBA备货审核和进度页面数据导出','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/createapplication/timeliness_statistics/','GET','FBA备货时效统计表页面','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/budgetallocations/','GET','FBA仓备货预算分配页面数据查询与展示','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/budgetallocations/next/','GET','FBA仓备货预算分配页面下一级预算分配数据展示','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/budgetallocations/','POST','FBA仓备货预算分配页面编辑预算金额','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/reviewprocesslist/','GET','FBA审核流程配置页面数据展示','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/reviewprocesslist/search/','GET','FBA审核流程配置页面数据查询','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/reviewprocesslist/','PUT','FBA审核流程配置页面启用/禁用审核流程','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/departments/','GET','FBA创建审核流程时获取指定部门及组(到组一级别)/FBA仓预算配置指定预算分配部门','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/positionslevels/','GET','FBA创建审核流程时选择审核流程字段','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/reviewprocess/','POST','FBA创建审核流程(确定按钮)','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/usernames/','GET','FBA仓预算配置页面选择用户','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/departmentprincipals/','POST','FBA仓预算权限配置页面负责人预算权限分配(提交按钮)','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/departmentprincipals/','GET','FBA仓预算权限管理页面数据查询与展示','2021-02-01 18:31:52','2021-02-01 18:31:52');
+insert into oms_permission_list (api_url_address,request_method,permission_name,create_time,update_time) values ('/api/v1/basicconfiguration/departmentprincipals/','PUT','FBA仓预算权限管理页面删除操作','2021-02-01 18:31:52','2021-02-01 18:31:52');
+
+========= oms_permission ==========
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA备货申请页面数据查询与展示', '1+2+3+4+5+6+7+8+9+10+11+30', 'root', 'root', 0, 0, 0);
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA批量备货模板下载/FBA批量备货处理结果', '1+2+3+4+5+6+7+8+9+10+11', 'root', 'root', 0, 0, 0);
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA单个备货/FBA导入批量备货', '1+2+3+4+5+6+7+8+9+10+11+29', 'root', 'root', 0, 0, 0);
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA备货审核和进度页面数据查询与展示', '12+13+14+15', 'root', 'root', 0, 0, 0);
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA备货审核和进度页面备货仓下拉展示', '16+17+18+19+20+21+22+23+24+25', 'root', 'root', 0, 0, 0);
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA备货审核和进度页面计划用时/实际用时数据展示', '26+27+28', 'root', 'root', 0, 0, 0);
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA备货审核和进度页面单个/批量备货单审核/驳回', '31+32+33+34+35+36', 'root', 'root', 0, 0, 0);
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA备货审核和进度页面单个备货单撤销', '37+38+39+40+41+42+43+44+45+46+47+48', 'root', 'root', 0, 0, 0);
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA批量审核模板下载/FBA批量审核处理结果', '37+38+39+40+41+42+43+44+45+46+47+48', 'root', 'root', 0, 0, 0);
+insert into oms_permission (create_time, update_time, api_name, permission_list, executor, operator, permission_type, is_active, category) values ('2021-01-27 06:06:04', '2021-01-27 06:06:04', 'FBA导入批量审核', '37+38+39+40+41+42+43+44+45+46+47+48', 'root', 'root', 0, 0, 0);
+```
+
+#### 6. 新增序列化器
+
+```python
+# oms_test/basic/serializers.py
+from rest_framework import serializers
+from .models import PermissionRecord, Permission
+
+
+class PermissionRecordSerializer(serializers.ModelSerializer):
+    """权限记录序列化器"""
+
+    class Meta:
+        model = PermissionRecord
+        fields = "__all__"
+        read_only_fields = ['create_time', 'update_time']
+
+
+class PermissionSerializer(serializers.ModelSerializer):
+    """权限序列化器"""
+
+    class Meta:
+        model = Permission
+        fields = "__all__"
+        read_only_fields = ['create_time', 'update_time']
+```
+
+#### 7. 获取权限组合视图
+
+```python
+# oms_test/utils/permission_combination.py
+def get_permission_combination(api_name, permission_type):
+    """获取权限组合ID示例"""
+    # 查看权限配置
+    if permission_type == 0:
+        if api_name == "海外仓备货申请页":
+            permission_list = '1'
+        elif api_name == "海外仓备货进度查看":
+            permission_list = '4+5'
+        elif api_name == "海外仓备货审核":
+            permission_list = '8'
+        elif api_name == "海外仓备货公式配置":
+            permission_list = '13+15'
+        elif api_name == "海外仓备货系数设置":
+            permission_list = '19+22+25'
+        elif api_name == "海外仓备货预算分配":
+            permission_list = '27+28'
+        elif api_name == "待分配调拨清单":
+            permission_list = '32'
+        elif api_name == "待创建调拨清单":
+            permission_list = '45'
+        elif api_name == "已创建调拨清单":
+            permission_list = '43'
+        elif api_name == "备货已结案清单":
+            permission_list = '41'
+        elif api_name == 'FBA仓备货申请页':
+            permission_list = '49'
+        elif api_name == 'FBA仓备审核和进度':
+            permission_list = '52+54'
+        elif api_name == 'FBA仓备货时效统计表':
+            permission_list = '60'
+        elif api_name == 'FBA仓备货预算分配':
+            permission_list = '61+62'
+        elif api_name == 'FBA审核流程配置':
+            permission_list = '64+65'
+        elif api_name == 'FBA仓预算权限配置':
+            permission_list = '72'
+        else:
+            permission_list = ''
+    # 操作权限配置(包含查看权限)
+    else:
+        if api_name == "海外仓备货申请页":
+            permission_list = '1+2+3+4'
+        elif api_name == "海外仓备货进度查看":
+            permission_list = '4+5+6+7'
+        elif api_name == "海外仓备货审核":
+            permission_list = '8+9+10+11+29'
+        elif api_name == "海外仓备货公式配置":
+            permission_list = '12+13+14+15'
+        elif api_name == "海外仓备货系数设置":
+            permission_list = '16+17+19+20+21+22'
+        elif api_name == "海外仓备货预算分配":
+            permission_list = '26+27+28'
+        elif api_name == "待分配调拨清单":
+            permission_list = '31+32+33+34+35+36'
+        elif api_name == "待创建调拨清单":
+            permission_list = '45+46+47+48'
+        elif api_name == "已创建调拨清单":
+            permission_list = '43+44'
+        elif api_name == "备货已结案清单":
+            permission_list = '41+42'
+        elif api_name == 'FBA仓备货申请页':
+            permission_list = '49+50+51'
+        elif api_name == 'FBA仓备审核和进度':
+            permission_list = '52+54+55+56+57+58+59'
+        elif api_name == 'FBA仓备货时效统计表':
+            permission_list = '60'
+        elif api_name == 'FBA仓备货预算分配':
+            permission_list = '61+62+63'
+        elif api_name == 'FBA审核流程配置':
+            permission_list = '64+65+66+67+68+69'
+        elif api_name == 'FBA仓预算权限配置':
+            permission_list = '71+72+73'
+        else:
+            permission_list = ''
+
+    return permission_list
+```
+
+#### 8. 分页视图处理
+
+```python
+# oms_test/utils/page_settings.py
+from rest_framework.pagination import PageNumberPagination
+
+
+class MyPageNumber(PageNumberPagination):
+
+    page_size = 10  # 每页显示多少条
+    page_size_query_param = 'limit'  # URL中每页显示条数的参数
+    page_query_param = 'page'  # URL中页码的参数
+    max_page_size = 1000  # 每页最大条数数限制
+```
+
+#### 9. 
+
+```python
+# oms_test/basic/views/permission_config.py
+from datetime import datetime
+from django.db import transaction
+from rest_framework.views import APIView
+from utils.get_username import get_username
+from rest_framework.response import Response
+from utils.page_settings import MyPageNumber
+from django.utils.decorators import method_decorator
+from basic.models import Permission, PermissionRecord
+from utils.decorator_func import login_auth, admin_auth
+from utils.permission_combination import get_permission_combination
+from basic.serializers import PermissionRecordSerializer, PermissionSerializer
+
+
+class PermissionConfigView(APIView):
+    """权限配置"""
+
+    @method_decorator(login_auth)
+    @method_decorator(admin_auth)
+    def post(self, request):
+        """新增权限配置"""
+
+        operator = get_username(request)
+        category = request.data.get('category', '')
+        executor = request.data.get('executor', None)
+        api_name_list = request.data.get('api_name_list', [])
+        permission_type = request.data.get('permission_type', None)
+        update_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        if not api_name_list:
+            return Response({"code": 0, "desc": "界面模块名未知"})
+        if not permission_type:
+            return Response({"code": 0, "desc": "操作权限未知"})
+        with transaction.atomic():
+            save_point = transaction.savepoint()
+            try:
+                for api_name in api_name_list:
+                    permission_obj = Permission.objects.filter(api_name=api_name, operator=operator,
+                                                               permission_type=permission_type).first()
+                    # 如果已经创建了权限配置记录, 则更新权限记录表
+                    if permission_obj:
+                        if permission_obj.is_active == 1:
+                            continue
+                        permission_obj.is_active = 1
+                        permission_obj.update_time = update_time
+                        permission_obj.save(update_fields=['is_active', 'update_time'])
+
+                        record_dict = {"permission": permission_obj.id, "before_change": 1, "after_change": 2,
+                                       "create_time": update_time, "update_time": update_time}
+                        record_serializer = PermissionRecordSerializer(data=record_dict)
+                        record_serializer.is_valid(raise_exception=True)
+                        record_serializer.save()
+                        continue
+
+                    # 没有就新建, 另外记录表也新增数据
+                    permission_list = get_permission_combination(api_name, permission_type)
+                    data_dict = dict(
+                        api_name=api_name,
+                        permission_list=permission_list,
+                        executor=executor,
+                        operator=operator,
+                        permission_type=permission_type,
+                        is_active=0,
+                        category=category,
+                        create_time=update_time,
+                        update_time=update_time
+                    )
+                    permission_serializer = PermissionSerializer(data=data_dict)
+                    permission_serializer.is_valid(raise_exception=True)
+                    new_obj = permission_serializer.save()
+
+                    record_dict = {"permission": new_obj.id, "before_change": 0, "after_change": 1,
+                                   "create_time": update_time, "update_time": update_time}
+                    record_serializer = PermissionRecordSerializer(data=record_dict)
+                    record_serializer.is_valid(raise_exception=True)
+                    record_serializer.save()
+
+                return Response({"code": 1, "desc": f"权限分配成功"})
+            except Exception as e:
+                transaction.savepoint_rollback(save_point)
+                return Response({"code": 0, "desc": f"权限分配失败：{e}"})
+
+    @method_decorator(login_auth)
+    @method_decorator(admin_auth)
+    def get(self, request):
+        """查询权限分配信息"""
+        executor = request.query_params.get("executor", None)
+        is_active = request.query_params.get("is_active", '未知')
+        category = request.query_params.get('category', None)
+        # 因为数据新建时默认是禁用的, 这里展示的时候也要优先展示禁用的并且按创建时间倒序排列
+        permission_infos = Permission.objects.filter(category=category).order_by('-is_active', '-create_time')
+        if executor:
+            permission_infos = permission_infos.filter(executor=executor)
+        if is_active != '未知':
+            permission_infos = permission_infos.filter(is_active=is_active)
+        count = permission_infos.count()
+        page = MyPageNumber()
+        page_info = page.paginate_queryset(queryset=permission_infos, request=request, view=self)
+        serializer = PermissionSerializer(page_info, many=True)
+
+        return Response({"code": 1, "desc": "succeed", "data": serializer.data, "count": count})
+
+
+class PermissionRecordListView(APIView):
+    """查看权限分配记录"""
+
+    @method_decorator(login_auth)
+    @method_decorator(admin_auth)
+    def get(self, request):
+
+        category = request.query_params.get('category', None)
+        record_infos = PermissionRecord.objects.filter(category=category).order_by('-id')
+        count = record_infos.count()
+        page = MyPageNumber()
+        page_info = page.paginate_queryset(queryset=record_infos, request=request, view=self)
+        serializer = PermissionRecordSerializer(page_info, many=True)
+        return Response({"code": 1, "desc": "succeed", "data": serializer.data, "count": count})
+
+
+class PermissionChangeView(APIView):
+    """修改权限状态"""
+
+    @method_decorator(login_auth)
+    @method_decorator(admin_auth)
+    def put(self, request):
+        update_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        with transaction.atomic():
+            save_point = transaction.savepoint()
+            try:
+                operator = get_username(request)
+                pk = request.data.get("id", None)
+                is_active = request.data.get("is_active", "未知")
+                # 更新权限配置表对应数据的状态
+                permission_obj = Permission.objects.get(id=pk)
+                before_change = permission_obj.is_active
+                permission_obj.is_active = is_active
+                permission_obj.operator = operator
+                permission_obj.update_time = update_time
+                permission_obj.save(update_fields=['is_active', 'operator', 'update_time'])
+                # 更新权限记录表对应的状态
+                record = {"permission": pk, "before_change": before_change, "after_change": is_active,
+                          "create_time": update_time, "update_time": update_time}
+                record_serializer = PermissionRecordSerializer(data=record)
+                record_serializer.is_valid(raise_exception=True)
+                record_serializer.save()
+                return Response({"code": 1, "desc": "权限状态修改成功"})
+            except Exception as e:
+                transaction.savepoint_rollback(save_point)
+                return Response({"code": 0, "desc": f"权限状态修改失败：{e}"})
+```
+
+
 
 #### 
 

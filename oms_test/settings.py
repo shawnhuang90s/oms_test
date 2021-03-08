@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     # 自建应用
     'store.apps.StoreConfig',
     'user.apps.UserConfig',
+    'basic.apps.BasicConfig',
 ]
 
 MIDDLEWARE = [
