@@ -352,3 +352,147 @@ if __name__ == '__main__':
 python manage.py send_store_info
 ```
 
+### 登录验证装饰器
+
+```python
+# oms_test/utils/decorator_func.py
+from rest_framework import status
+from rest_framework.response import Response
+
+
+def login_auth(func):
+    """登录验证装饰器"""
+    @wraps(func)
+    def inner(request, *args, **kwargs):
+        session_id = request.COOKIES.get('sessionid', None)
+        messages = request.COOKIES.get('messages', None)
+        if session_id and messages:
+            return func(request, *args, **kwargs)
+        else:
+            return Response({'code': 0, 'desc': '请登录后再访问'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    return inner
+```
+
+### 验证当前用户是否是超管装饰器
+
+#### 1. 从 COOKIES 中获取用户名 
+
+```python
+# oms_test/utils/get_username.py
+def get_username(request):
+    """从 COOKIES 中获取用户名"""
+    try:
+        cookie = request.COOKIES
+        if "messages" not in cookie.keys():
+            return None
+        messages = cookie["messages"].split("$")[1]
+        try:
+            info = messages.split('."]')[0].split(", ")[1]
+        except Exception:
+            info = messages.split('."]')[0].split("as ")[1]
+        username = info.encode("utf-8").decode("unicode_escape")
+    except Exception:
+        return None
+
+    return username
+```
+
+#### 2. 装饰器的实现
+
+```python
+# oms_test/decorator_func.py
+from functools import wraps
+from user.models import User
+from rest_framework import status
+from utils.get_username import get_username
+from rest_framework.response import Response
+
+
+def login_auth(func):
+    """登录验证装饰器"""
+    @wraps(func)
+    def inner(request, *args, **kwargs):
+        session_id = request.COOKIES.get('sessionid', None)
+        messages = request.COOKIES.get('messages', None)
+        if session_id and messages:
+            return func(request, *args, **kwargs)
+        else:
+            return Response({'code': 0, 'desc': '请登录后再访问'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    return inner
+
+
+def admin_auth(func):
+    """超管校验装饰器"""
+    @wraps(func)
+    def inner(self, request, *args, **kwargs):
+        username = get_username(request)
+        if not username:
+            return Response({"code": 0, "desc": "获取用户名失败"}, status=status.HTTP_200_OK)
+        user_obj = User.objects.filter(username=username).first()
+        if not user_obj:
+            return Response({"code": 0, "desc": "用户名不存在"}, status=status.HTTP_200_OK)
+        if user_obj.is_superuser == True:
+            return func(self, request, *args, **kwargs)
+        else:
+            return Response({"code": 0, "desc": "您没有权限执行此操作!"}, status=status.HTTP_200_OK)
+
+    return inner
+```
+
+### 提供选择用户接口
+
+#### 1. 视图处理
+
+```python
+# oms_test/user/views.py
+from user.models import User
+from rest_framework.views import APIView
+from utils.decorator_func import login_auth
+from rest_framework.response import Response
+from django.utils.decorators import method_decorator
+
+
+class UserListView(APIView):
+    """用户信息展示接口"""
+	
+    # 测试的时候把登录验证装饰器注释掉
+    # @method_decorator(login_auth)
+    def get(self, request):
+        try:
+            user_list = [i.username for i in User.objects.all()]
+        except Exception as e:
+            print(e)
+            user_list = []
+        ret = {'code': 1, 'data': user_list}
+
+        return Response(data=ret)
+```
+
+#### 2. 路径配置
+
+```python
+# oms_test/oms_test/urls.py
+urlpatterns = [
+    ......
+    path('store/', include(('store.urls', 'store'), namespace='store')),
+    path('user/', include(('user.urls', 'user'), namespace='user')),
+    ......
+]
+
+# oms_test/user/urls.py
+from django.urls import path
+from .views import UserListView
+
+urlpatterns = [
+    path('user_list/', UserListView.as_view()),  # 选择用户接口
+]
+```
+
+
+
+#### 
+
+
+

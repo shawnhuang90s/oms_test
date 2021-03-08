@@ -12,5 +12,6 @@ def clock_show(request):
 urlpatterns = [
     path('', clock_show),
     path('store/', include(('store.urls', 'store'), namespace='store')),
+    path('user/', include(('user.urls', 'user'), namespace='user')),
     re_path('api_doc/(?P<path>.*)', serve, {'document_root': API_DOC_ROOT}),
 ]
