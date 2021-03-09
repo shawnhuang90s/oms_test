@@ -33,6 +33,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'utils.custom_middleware.LoggerMiddleware',
 ]
 
 ROOT_URLCONF = 'oms_test.urls'
@@ -104,4 +105,5 @@ REST_FRAMEWORK = {
 # 日志配置
 KAFKA_LOG = oms_log.kafka_log
 STORE_LOG = oms_log.store_log
+OMS_LOG = oms_log.oms_log
 
