@@ -19,6 +19,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     # 'django.contrib.staticfiles',
 
+    # 第三方应用
+    'django_crontab',
+
     # 自建应用
     'store.apps.StoreConfig',
     'user.apps.UserConfig',
@@ -106,4 +109,11 @@ REST_FRAMEWORK = {
 KAFKA_LOG = oms_log.kafka_log
 STORE_LOG = oms_log.store_log
 OMS_LOG = oms_log.oms_log
+CRONTAB_LOG = oms_log.crontab_log
 
+# 定时任务配置
+CRONJOBS = [
+    # 每一分钟执行一次测试函数, 后面的参数从项目根目录开始
+    # 比如这里相当于执行 oms_test/basic/tests 下的 crontab_test()
+    ('*/1 * * * *', 'basic.tests.crontab_test'),
+]
