@@ -12,7 +12,6 @@ class PermissionList(BaseModel):
     permission_name = models.CharField(max_length=128, verbose_name="权限名称")
 
     class Meta:
-        managed = False
         db_table = 'oms_permission_list'
         app_label = 'basic'
         verbose_name = verbose_name_plural = '权限接口详情表'
@@ -46,7 +45,6 @@ class Permission(BaseModel):
     category = models.SmallIntegerField(choices=CATEGORY_TYPE, default=0, verbose_name='模块类别')
 
     class Meta:
-        managed = False
         db_table = 'oms_permission'
         app_label = 'basic'
         verbose_name = verbose_name_plural = '查看/操作权限表'
@@ -62,11 +60,10 @@ class PermissionRecord(BaseModel):
     )
     id = models.AutoField(primary_key=True)
     permission = models.ForeignKey(Permission, related_name="permission_id", verbose_name="权限ID", on_delete=models.CASCADE)
-    before_change = models.SmallIntegerField(choices=STATE_CHOICES, verbose_name="被修改之前的状态")
-    after_change = models.SmallIntegerField(choices=STATE_CHOICES, verbose_name="被修改之后的状态")
+    before_change = models.SmallIntegerField(choices=STATE_TYPE, verbose_name="被修改之前的状态")
+    after_change = models.SmallIntegerField(choices=STATE_TYPE, verbose_name="被修改之后的状态")
 
     class Meta:
-        managed = False
         db_table = 'oms_permission_record'
         app_label = 'basic'
         verbose_name = verbose_name_plural = '查看/操作权限记录表'

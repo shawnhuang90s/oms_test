@@ -1,9 +1,4 @@
-import os
-import django
 from django.db import models
-if not os.environ.get('DJANGO_SETTINGS_MODULE'):
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
-django.setup()
 
 
 class BaseModel(models.Model):

@@ -189,7 +189,6 @@ class User(models.Model):
     date_joined = models.DateTimeField(verbose_name='加入时间')
 
     class Meta:
-        managed = False
         db_table = 'oms_user'
         app_label = 'user'
         verbose_name = verbose_name_plural = '用户表'

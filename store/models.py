@@ -27,9 +27,6 @@ class Store(models.Model):
     last_download_time = models.DateTimeField(blank=True, null=True, verbose_name='上次抓单时间')
 
     class Meta:
-        # 告诉 Django 不要管理这个模型类的创建, 修改和删除
-        # 想要允许 Django 管理这个模型类的生命周期, 直接删掉它(因为 True 是默认值)
-        managed = False
         # 指明该模型类属于 store 这个子应用
         app_label = 'store'
         db_table = 'oms_store'

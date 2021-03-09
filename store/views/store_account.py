@@ -188,7 +188,7 @@ if __name__ == '__main__':
     # 保存测试数据到 Redis
     save_store_account()
     # 查看 Redis 中是否有数据
-    for i in range(1, 116):
+    for i in range(1, 501):
         store_key = f'test_store_{i}'
         account_info = redis_conn.hget(store_account_key, store_key)
         print(account_info)

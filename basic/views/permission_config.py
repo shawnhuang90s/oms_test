@@ -78,25 +78,30 @@ class PermissionConfigView(APIView):
                 transaction.savepoint_rollback(save_point)
                 return Response({"code": 0, "desc": f"权限分配失败：{e}"})
 
-    @method_decorator(login_auth)
-    @method_decorator(admin_auth)
+    # @method_decorator(login_auth)
+    # @method_decorator(admin_auth)
     def get(self, request):
         """查询权限分配信息"""
-        executor = request.query_params.get("executor", None)
-        is_active = request.query_params.get("is_active", '未知')
-        category = request.query_params.get('category', None)
-        # 因为数据新建时默认是禁用的, 这里展示的时候也要优先展示禁用的并且按创建时间倒序排列
-        permission_infos = Permission.objects.filter(category=category).order_by('-is_active', '-create_time')
-        if executor:
-            permission_infos = permission_infos.filter(executor=executor)
-        if is_active != '未知':
-            permission_infos = permission_infos.filter(is_active=is_active)
-        count = permission_infos.count()
-        page = MyPageNumber()
-        page_info = page.paginate_queryset(queryset=permission_infos, request=request, view=self)
-        serializer = PermissionSerializer(page_info, many=True)
+        try:
+            executor = request.query_params.get("executor", None)
+            is_active = request.query_params.get("is_active", '未知')
+            category = request.query_params.get('category', None)
+            # 因为数据新建时默认是禁用的, 这里展示的时候也要优先展示禁用的并且按创建时间倒序排列
+            permission_infos = Permission.objects.all().order_by('-is_active', '-create_time')
+            if category:
+                permission_infos = permission_infos.filter(category=category)
+            if executor:
+                permission_infos = permission_infos.filter(executor=executor)
+            if is_active != '未知':
+                permission_infos = permission_infos.filter(is_active=is_active)
+            count = permission_infos.count()
+            page = MyPageNumber()
+            page_info = page.paginate_queryset(queryset=permission_infos, request=request, view=self)
+            serializer = PermissionSerializer(page_info, many=True)
 
-        return Response({"code": 1, "desc": "succeed", "data": serializer.data, "count": count})
+            return Response({"code": 1, "desc": "succeed", "data": serializer.data, "count": count})
+        except Exception as e:
+            return Response({"code": 1, "desc": "failed", "data": f"获取数据失败：{e}"})
 
 
 class PermissionRecordListView(APIView):

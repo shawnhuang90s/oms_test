@@ -511,12 +511,7 @@ INSTALLED_APPS = [
 
 ```python
 # oms_test/utils/base_model.py
-import os
-import django
 from django.db import models
-if not os.environ.get('DJANGO_SETTINGS_MODULE'):
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oms_test.settings')
-django.setup()
 
 
 class BaseModel(models.Model):
@@ -548,7 +543,6 @@ class PermissionList(BaseModel):
     permission_name = models.CharField(max_length=128, verbose_name="权限名称")
 
     class Meta:
-        managed = False
         db_table = 'oms_permission_list'
         app_label = 'basic'
         verbose_name = verbose_name_plural = '权限接口详情表'
@@ -582,7 +576,6 @@ class Permission(BaseModel):
     category = models.SmallIntegerField(choices=CATEGORY_TYPE, default=0, verbose_name='模块类别')
 
     class Meta:
-        managed = False
         db_table = 'oms_permission'
         app_label = 'basic'
         verbose_name = verbose_name_plural = '查看/操作权限表'
@@ -601,7 +594,6 @@ class PermissionRecord(BaseModel):
     after_change = models.SmallIntegerField(choices=STATE_CHOICES, verbose_name="被修改之后的状态")
 
     class Meta:
-        managed = False
         db_table = 'oms_permission_record'
         app_label = 'basic'
         verbose_name = verbose_name_plural = '查看/操作权限记录表'
@@ -1026,6 +1018,12 @@ def permission_auth(func):
             return Response({"code": 0, "desc": "对不起, 您没有权限!"}, status=status.HTTP_200_OK)
 
     return inner
+```
+
+### 日志中间件的设计
+
+```python
+# oms_test/oms_test/settings.py
 ```
 
 

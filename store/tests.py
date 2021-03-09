@@ -55,7 +55,7 @@ def batch_create02():
 def batch_create03():
     """批量创建店铺表测试数据（方法三）"""
     store_list = list()
-    for i in range(1, 200):
+    for i in range(1, 501):
         store_dict = dict(
             name=f'test_store_{i}',
             manager_name=f'test_manager_{i}',
@@ -80,6 +80,6 @@ def batch_create03():
 if __name__ == '__main__':
     # batch_create01()
     # batch_create02()
-    # batch_create03()
-    r = Store.objects.first()
-    print(r)
+    batch_create03()
+    # r = Store.objects.first()
+    # print(r)
