@@ -374,7 +374,7 @@ def login_auth(func):
     return inner
 ```
 
-### 验证当前用户是否是超管装饰器
+### 超管验证装饰器
 
 #### 1. 从 COOKIES 中获取用户名 
 
@@ -490,7 +490,7 @@ urlpatterns = [
 ]
 ```
 
-### 页面数据查看/操作权限管理
+### 权限配置与权限管理
 
 #### 1. 新建子应用 basic
 
@@ -819,7 +819,7 @@ class MyPageNumber(PageNumberPagination):
     max_page_size = 1000  # 每页最大条数数限制
 ```
 
-#### 9. 
+#### 9. 权限配置视图处理
 
 ```python
 # oms_test/basic/views/permission_config.py
@@ -972,9 +972,65 @@ class PermissionChangeView(APIView):
                 return Response({"code": 0, "desc": f"权限状态修改失败：{e}"})
 ```
 
+#### 10. 路径配置
+
+```python
+# oms_test/basic/urls.py
+from django.urls import path
+from basic.views.permission_config import PermissionConfigView
 
 
-#### 
+urlpatterns = [
+    path('permission_config/', PermissionConfigView.as_view()),  # 权限配置接口
+]
+```
+
+#### 11. 权限验证装饰器
+
+```python
+# oms_test/utils/decorator_func.py
+from functools import wraps
+from user.models import User
+from rest_framework import status
+from utils.get_username import get_username
+from rest_framework.response import Response
+from basic.models import PermissionList, Permission
+
+
+......
+
+
+def permission_auth(func):
+    """权限验证装饰器"""
+    @wraps(func)
+    def inner(request, *args, **kwargs):
+        api_url_address = request.path_info
+        request_method = request.method
+        username = get_username(request)
+        permission_obj = PermissionList.objects.filter(api_url_address=api_url_address, request_method=request_method).first()
+        if not permission_obj:
+            return Response({"code": 0, "desc": "权限详情表中未找到对应的接口"}, status=status.HTTP_200_OK)
+
+        permission_id = permission_obj.id
+        permission_infos = Permission.objects.filter(user=username, is_active=1)
+        if not permission_infos:
+            return Response({"code": 0, "desc": "对不起, 您没有权限!"}, status=status.HTTP_200_OK)
+        permission_list = list()
+        for obj in permission_infos:
+            permission_list_str = obj.permission_list
+            id_list = permission_list_str.split('+')
+            permission_list.extend(id_list)
+        if str(permission_id) in permission_list:
+            return func(request, *args, **kwargs)
+        else:
+            return Response({"code": 0, "desc": "对不起, 您没有权限!"}, status=status.HTTP_200_OK)
+
+    return inner
+```
+
+
+
+
 
 
 
