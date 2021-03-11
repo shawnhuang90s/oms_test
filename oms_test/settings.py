@@ -1,4 +1,5 @@
 import os
+import djcelery
 from pathlib import Path
 from oms_conf import oms_db, oms_redis, oms_kafka, oms_log
 
@@ -21,6 +22,7 @@ INSTALLED_APPS = [
 
     # 第三方应用
     'django_crontab',
+    'djcelery',
 
     # 自建应用
     'store.apps.StoreConfig',
@@ -117,3 +119,10 @@ CRONJOBS = [
     # 比如这里相当于执行 oms_test/basic/tests 下的 crontab_test()
     ('*/1 * * * *', 'basic.tests.crontab_test'),
 ]
+
+# 任务队列 Celery 配置
+djcelery.setup_loader()
+BROKER_BACKEND = 'redis'
+BROKER_URL = 'redis://127.0.0.1:6379/1'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/2'
+CELERY_ACCEPT_CONTENT = ['pickle', 'json', ]
