@@ -112,6 +112,7 @@ KAFKA_LOG = oms_log.kafka_log
 STORE_LOG = oms_log.store_log
 OMS_LOG = oms_log.oms_log
 CRONTAB_LOG = oms_log.crontab_log
+FILE_LOG = oms_log.file_log
 
 # 定时任务配置
 CRONJOBS = [
@@ -126,3 +127,7 @@ BROKER_BACKEND = 'redis'
 BROKER_URL = 'redis://127.0.0.1:6379/1'
 CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/2'
 CELERY_ACCEPT_CONTENT = ['pickle', 'json', ]
+
+# 文件上传与下载路径配置
+UPLOAD_ROOT = os.path.join(BASE_DIR, 'files/upload/')
+DOWNLOAD_ROOT = os.path.join(BASE_DIR, 'files/download/')

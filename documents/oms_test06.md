@@ -259,11 +259,48 @@ Configuration ->
 [2021-03-11 08:39:22,068: INFO/MainProcess] beat: Starting...
 ```
 
+### excel 文件上传下载 与 Celery 配合使用
+
+#### 1. 项目中新建 excel 上传下载目录
+
+```bash
+# oms_test/files/download/
+# oms_test/files/upload/
+```
+
+#### 2. 配置文件添加路径
+
+```python
+# oms_test/oms_test/settings.py
+......
+# 文件上传与下载路径配置
+UPLOAD_ROOT = os.path.join(BASE_DIR, 'files/upload/')
+DOWNLOAD_ROOT = os.path.join(BASE_DIR, 'files/download/')
+```
+
+#### 3. 新增日志
+
+```python
+# oms_test/oms_conf/oms_log.py
+......
+# 文件上传下载日志配置
+file_log = f'{log_base_path}/file/'
+
+# oms_test/oms_test/settings.py
+......
+CRONTAB_LOG = oms_log.crontab_log
+FILE_LOG = oms_log.file_log
+......
+```
+
+#### 4. 处理 excel 文件内容
+
+```python
+# oms_test/basic/views.py
+
+```
 
 
-
-
-### excel 文件上传下载
 
 #### 1. 定义 excel 文件表头样式
 
