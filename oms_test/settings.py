@@ -1,5 +1,4 @@
 import os
-import djcelery
 from pathlib import Path
 from oms_conf import oms_db, oms_redis, oms_kafka, oms_log
 
@@ -22,12 +21,13 @@ INSTALLED_APPS = [
 
     # 第三方应用
     'django_crontab',
-    'djcelery',
+    'django_celery_results',
 
     # 自建应用
     'store.apps.StoreConfig',
     'user.apps.UserConfig',
     'basic.apps.BasicConfig',
+    'celery_tasks.apps.CeleryTasksConfig',
 ]
 
 MIDDLEWARE = [
@@ -121,12 +121,14 @@ CRONJOBS = [
     ('*/1 * * * *', 'basic.tests.crontab_test'),
 ]
 
-# 任务队列 Celery 配置
-djcelery.setup_loader()
-BROKER_BACKEND = 'redis'
-BROKER_URL = 'redis://127.0.0.1:6379/1'
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/2'
-CELERY_ACCEPT_CONTENT = ['pickle', 'json', ]
+# Celery 配置
+CELERY_TIMEZONE = "Asia/Shanghai"
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_IMPORTS = (
+    'tasks',  # 导入根目录下 tasks.py 文件
+)
 
 # 文件上传与下载路径配置
 UPLOAD_ROOT = os.path.join(BASE_DIR, 'files/upload/')

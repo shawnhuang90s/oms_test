@@ -14,5 +14,6 @@ urlpatterns = [
     path('store/', include(('store.urls', 'store'), namespace='store')),
     path('user/', include(('user.urls', 'user'), namespace='user')),
     path('basic/', include(('basic.urls', 'basic'), namespace='basic')),
+    path('celery_tasks/', include(('celery_tasks.urls', 'celery_tasks'), namespace='celery_tasks')),
     re_path('api_doc/(?P<path>.*)', serve, {'document_root': API_DOC_ROOT}),
 ]
