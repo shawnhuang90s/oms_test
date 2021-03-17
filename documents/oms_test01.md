@@ -442,3 +442,4 @@ django.core.exceptions.ImproperlyConfigured: mysqlclient 1.4.0 or newer is requi
 # 再次运行 manage.py 文件, 如果没有报错
 点击左上角 manage.py 框里的三角形 -> 点击 Edit Configurations -> 找到 Parameters，对应框里输入：runserver 127.0.0.1:8080 -> Apply -> OK -> 点击刚才 manage.py 框右边的绿色三角形直接运行项目 -> 此时 Pycharm 下面的 Run 窗口会自动弹开 -> 点击网址：http://127.0.0.1:8080/ -> 自动在浏览器弹出一个网址, 即 Django 运行页面
 ```
+

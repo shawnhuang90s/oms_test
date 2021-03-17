@@ -183,6 +183,7 @@ class Store(models.Model):
     last_download_time = models.DateTimeField(null=True, blank=True, verbose_name='上次抓单时间')
 
     class Meta:
+        # managed = False
         # 指明该模型类属于 store 这个子应用
         app_label = 'store'
         db_table = 'oms_store'

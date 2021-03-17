@@ -518,7 +518,7 @@ bin/kafka-console-consumer.sh --topic quickstart-events --from-beginning --boots
 # 这里可以分开两个终端来执行，这样只有生产者发出消息了，消费者就会立即收到该消息
 ```
 
-#### 10. 删除本地 kafka 环境的任何数据
+#### 9. 删除本地 kafka 环境的任何数据
 
 ```bash
 # 查看 zookeeper 进程并杀死
@@ -528,7 +528,7 @@ kill -9 端口号
 rm -rf /tmp/kafka-logs /tmp/zookeeper
 ```
 
-#### 11. 单机伪集群配置
+#### 10. 单机伪集群配置
 
 ##### 1) 复制两份服务配置文件
 

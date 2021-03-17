@@ -390,7 +390,7 @@ Out[6]: '4312da5b-5897-4115-824c-1c785e13cbb1'
 #### 14. 使用 celery_once 包对 Redis 加锁
 
 - 目前还会出现一种情况，那就是相同的任务在不同的 worker 中可能会被重复执行
-- 注意前面我们使用 Redis 作为 Broker，要想避免这种情况，有两种解决方案
+- 现在我们使用 Redis 作为 Broker，要想避免这种情况，有两种解决方案
 - 一种是在执行任务的时候加上 Redis 分布式锁
 - 一种是使用 celery_once 包，其实也是利用 Redis 加锁的原理，对任务去重
 
@@ -482,7 +482,7 @@ urlpatterns = [
 ......
 ```
 
-#### 5. 处理 excel 文件内容
+#### 5. 视图处理
 
 ```python
 # 项目中新建处理任务队列的目录：oms_test/oms_test/celery_tasks
